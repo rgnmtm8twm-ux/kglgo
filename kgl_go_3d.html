@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>KGL GO — Street Level</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; overflow:hidden; font-family:'Arial Black','Arial',sans-serif; }
+canvas { display:block; }
+
+/* ── HUD ───────────────────────────────── */
+#hud {
+  position:fixed; inset:0; pointer-events:none; z-index:10;
+}
+
+/* Speedometer */
+#speedo {
+  position:absolute; bottom:28px; right:28px;
+  width:110px; height:110px;
+  background:rgba(0,0,0,0.72);
+  border:2px solid #00ff88;
+  border-radius:50%;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  box-shadow:0 0 18px rgba(0,255,136,0.3);
+}
+#speed-num  { font-size:32px; font-weight:900; color:#00ff88; line-height:1; }
+#speed-unit { font-size:11px; color:rgba(0,255,136,0.6); letter-spacing:2px; margin-top:2px; }
+
+/* Mission panel */
+#mission-panel {
+  position:absolute; top:18px; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,0.78);
+  border:1px solid rgba(255,255,255,0.18);
+  border-radius:14px; padding:10px 22px;
+  text-align:center; min-width:280px; color:#fff;
+}
+#mission-label { font-size:10px; opacity:0.55; letter-spacing:2px; text-transform:uppercase; }
+#mission-text  { font-size:14px; margin-top:4px; }
+#tip-val       { font-size:22px; font-weight:900; color:#FFD700; margin-top:3px; }
+
+/* Camera toggle btn */
+#cam-btn {
+  position:absolute; top:18px; right:18px;
+  background:rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.25);
+  color:#fff; padding:8px 14px; border-radius:8px;
+  font-size:12px; cursor:pointer; pointer-events:all;
+  letter-spacing:1px;
+}
+#cam-btn:hover { background:rgba(255,255,255,0.12); }
+
+/* Controls hint */
+#hint {
+  position:absolute; bottom:28px; left:28px;
+  color:rgba(255,255,255,0.4); font-size:11px; line-height:1.7;
+}
+
+/* Crash flash */
+#crash-flash {
+  position:absolute; inset:0;
+  background:rgba(255,30,30,0.38);
+  opacity:0; pointer-events:none;
+}
+
+/* Mission progress dots */
+#progress {
+  position:absolute; top:18px; left:18px;
+  display:flex; gap:6px; align-items:center;
+}
+.dot {
+  width:10px; height:10px; border-radius:50%;
+  background:rgba(255,255,255,0.2);
+  border:1px solid rgba(255,255,255,0.3);
+}
+.dot.done { background:#00ff88; border-color:#00ff88; }
+.dot.active { background:#FFD700; border-color:#FFD700; box-shadow:0 0 6px #FFD700; }
+
+/* ── START SCREEN ──────────────────────── */
+#start-screen {
+  position:fixed; inset:0; background:rgba(0,0,0,0.92);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  z-index:100; color:#fff;
+}
+#start-screen h1 {
+  font-size:72px; font-weight:900; letter-spacing:-3px;
+  margin-bottom:6px;
+}
+.green { color:#00ff88; }
+#start-screen .sub  { opacity:0.5; font-size:14px; margin-bottom:10px; }
+#start-screen .desc { opacity:0.7; font-size:13px; max-width:300px; text-align:center; margin-bottom:36px; line-height:1.6; }
+#start-btn {
+  background:#00ff88; color:#000; border:none;
+  padding:16px 52px; font-size:18px; font-weight:900;
+  border-radius:10px; cursor:pointer; pointer-events:all;
+  letter-spacing:1px;
+}
+#start-btn:hover { background:#00ee77; transform:scale(1.03); }
+
+/* ── Mobile joystick ────────────────────── */
+#joy-wrap {
+  position:absolute; bottom:22px; left:22px;
+  width:130px; height:130px;
+  display:none; pointer-events:all;
+}
+#joy-base {
+  width:130px; height:130px;
+  background:rgba(255,255,255,0.08);
+  border:2px solid rgba(255,255,255,0.2);
+  border-radius:50%; position:relative;
+}
+#joy-knob {
+  width:56px; height:56px;
+  background:rgba(0,255,136,0.65);
+  border:2px solid rgba(0,255,136,0.9);
+  border-radius:50%; position:absolute;
+  top:37px; left:37px; pointer-events:none;
+}
+@media(max-width:768px) {
+  #joy-wrap { display:block; }
+  #hint { display:none; }
+  #speedo { bottom:170px; }
+}
+</style>
+</head>
+<body>
+
+<!-- START SCREEN -->
+<div id="start-screen">
+  <h1>KGL <span class="green">GO</span></h1>
+  <div class="sub">🏍️  NYAMIRAMBO · KIGALI · RWANDA</div>
+  <div class="desc">Pick up passengers, dodge traffic,<br>keep the tip high. Real streets. Real speed.</div>
+  <button id="start-btn" onclick="startGame()">RIDE NOW</button>
+</div>
+
+<!-- HUD (hidden until game starts) -->
+<div id="hud" style="display:none">
+  <!-- Progress dots -->
+  <div id="progress"></div>
+
+  <!-- Mission -->
+  <div id="mission-panel">
+    <div id="mission-label">MISSION</div>
+    <div id="mission-text">Loading...</div>
+    <div id="tip-val">0 RWF</div>
+  </div>
+
+  <!-- Camera toggle -->
+  <button id="cam-btn" onclick="toggleCam()">👁 1ST PERSON</button>
+
+  <!-- Speedometer -->
+  <div id="speedo">
+    <div id="speed-num">0</div>
+    <div id="speed-unit">KM/H</div>
+  </div>
+
+  <!-- Crash flash -->
+  <div id="crash-flash"></div>
+
+  <!-- Controls hint -->
+  <div id="hint">
+    W / ↑ &nbsp; Accelerate<br>
+    S / ↓ &nbsp; Brake<br>
+    A D / ← → &nbsp; Steer<br>
+    Space &nbsp; Handbrake<br>
+    V &nbsp; Toggle camera
+  </div>
+
+  <!-- Joystick -->
+  <div id="joy-wrap">
+    <div id="joy-base"><div id="joy-knob"></div></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const ACCEL      = 0.018;
+const MAX_SPEED  = 0.70;
+const FRICTION   = 0.91;    // per-frame, frame-rate-compensated
+const TURN_SPD   = 0.034;
+const CAM_LAG    = 0.08;
+const CAM3_DIST  = 10;
+const CAM3_H     = 4.2;
+const PICKUP_RAD = 5.5;
+const CRASH_RAD  = 3.8;
+
+// Kigali building colours (warm African palette)
+const PALETTE = [
+  0xF2E3C6, 0xE4C99A, 0xD4956A, 0xB5C4B1,
+  0x8FA3BF, 0xC9A96E, 0xE8DDD2, 0xCFB997,
+  0xA67C52, 0xD8CBC0, 0xF0D9B5, 0xBBC8A8,
+];
+
+// ═══════════════════════════════════════════════════════════
+//  THREE.JS INIT
+// ═══════════════════════════════════════════════════════════
+const scene    = new THREE.Scene();
+scene.background = new THREE.Color(0x6EA8D8);
+scene.fog        = new THREE.FogExp2(0x90BFE0, 0.007);
+
+const W = window.innerWidth, H = window.innerHeight;
+const camera = new THREE.PerspectiveCamera(72, W/H, 0.1, 500);
+camera.position.set(0, 8, -14);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+renderer.outputEncoding    = THREE.sRGBEncoding;
+renderer.toneMapping       = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+document.body.appendChild(renderer.domElement);
+
+// ── Lights ──────────────────────────────────────────────────
+const sun = new THREE.DirectionalLight(0xFFF0D0, 2.0);
+sun.position.set(60, 120, 50);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+const sc = sun.shadow.camera;
+Object.assign(sc, { near:0.5, far:400, left:-180, right:180, top:180, bottom:-180 });
+sun.shadow.bias = -0.0008;
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xFFEECC, 0.55));
+scene.add(new THREE.HemisphereLight(0x87CEEB, 0xC1440E, 0.45));
+
+// ═══════════════════════════════════════════════════════════
+//  WORLD  — Ground, Roads, Buildings, Props
+// ═══════════════════════════════════════════════════════════
+
+// ── Ground (laterite red soil) ───────────────────────────
+const groundMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(700, 700),
+  new THREE.MeshLambertMaterial({ color: 0xB84C1A })
+);
+groundMesh.rotation.x = -Math.PI/2;
+groundMesh.receiveShadow = true;
+scene.add(groundMesh);
+
+// ── Road materials ───────────────────────────────────────
+const matRoad     = new THREE.MeshLambertMaterial({ color: 0x252520 });
+const matSidewalk = new THREE.MeshLambertMaterial({ color: 0x857F72 });
+const matMark     = new THREE.MeshLambertMaterial({ color: 0xF0EDD0 });
+
+// Build a straight road segment (along local X axis by default, rotateY for N-S)
+function makeRoad(cx, cz, length, width, rotY = 0) {
+  const g = new THREE.Group();
+
+  // Asphalt
+  addBox(g, length, 0.07, width, 0, 0.035, 0, matRoad, false, true);
+
+  // Sidewalks
+  const swW = 1.6;
+  addBox(g, length, 0.12, swW, 0, 0.06, -(width/2 + swW/2), matSidewalk, false, true);
+  addBox(g, length, 0.12, swW, 0, 0.06,  (width/2 + swW/2), matSidewalk, false, true);
+
+  // Dashed centre line
+  const dashLen = 3.0, dashGap = 4.0, dashW = 0.18;
+  const total = dashLen + dashGap;
+  const count = Math.floor(length / total);
+  for (let i = 0; i < count; i++) {
+    const x = -length/2 + total*i + dashLen/2 + 0.5;
+    addBox(g, dashLen, 0.08, dashW, x, 0.07, 0, matMark, false, false);
+  }
+  // Edge lines
+  [-width/2 + 0.3, width/2 - 0.3].forEach(ez => {
+    addBox(g, length, 0.08, 0.15, 0, 0.07, ez, matMark, false, false);
+  });
+
+  g.position.set(cx, 0, cz);
+  g.rotation.y = rotY;
+  scene.add(g);
+}
+
+function addBox(parent, w, h, d, x, y, z, mat, cast=true, recv=true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  m.castShadow  = cast;
+  m.receiveShadow = recv;
+  parent.add(m);
+  return m;
+}
+
+// Flat intersection patch
+function makeIntersection(cx, cz, size) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(size, 0.09, size), matRoad);
+  m.position.set(cx, 0.04, cz);
+  m.receiveShadow = true;
+  scene.add(m);
+}
+
+// ── Road Network (Nyamirambo-inspired) ───────────────────
+//  Coords: X = east, Z = south, Y = up
+//  Avenue de la Paix  → main E-W artery, z=0
+//  Rue Nyamirambo     → main N-S,        x=0
+//  Rue du Stade       → E-W secondary,   z=-90 (north)
+//  Rue Biryogo        → E-W secondary,   z=92 (south)
+//  Muhima N-S         → x=-130
+//  Kacyiru N-S        → x=130
+
+makeRoad(  0,   0, 440, 14);          // Avenue de la Paix  (E-W)
+makeRoad(  0,   0, 320, 12, Math.PI/2); // Rue Nyamirambo   (N-S)
+makeRoad( 40, -90, 300, 11);          // Rue du Stade       (E-W, north)
+makeRoad(-20,  92, 240,  9);          // Rue Biryogo        (E-W, south)
+makeRoad(-130, -35, 170,  9, Math.PI/2); // Muhima N-S
+makeRoad( 130,  35, 170,  9, Math.PI/2); // Kacyiru N-S
+makeRoad( -50, -45, 130,  8);         // Short connector NW
+makeRoad(  80,  50, 130,  8);         // Short connector SE
+
+// Intersections
+[ [0,0,18], [0,-90,15], [0,92,13], [-130,0,13], [130,0,13],
+  [40,-90,13], [-20,92,11], [-130,92,11], [130,-90,11],
+  [-50,-90,10], [80,92,10], [-50,0,11], [80,0,11] ]
+  .forEach(([x,z,s]) => makeIntersection(x,z,s));
+
+// ── Buildings ────────────────────────────────────────────
+function placeBuildings(xMin, xMax, zMin, zMax, count) {
+  const rng = (a,b) => a + Math.random()*(b-a);
+  const rngI = (a,b) => Math.floor(rng(a, b+1));
+  for (let i = 0; i < count; i++) {
+    const bw  = rng(9, 22);
+    const bd  = rng(9, 20);
+    const bh  = rng(6, 36);
+    const bx  = rng(xMin + bw/2, xMax - bw/2);
+    const bz  = rng(zMin + bd/2, zMax - bd/2);
+    const col = PALETTE[rngI(0, PALETTE.length-1)];
+    const mat = new THREE.MeshLambertMaterial({ color: col });
+
+    // Main block
+    const body = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), mat);
+    body.position.set(bx, bh/2, bz);
+    body.castShadow = true; body.receiveShadow = true;
+    scene.add(body);
+
+    // Roof trim (slightly darker)
+    const rc = new THREE.Color(col); rc.multiplyScalar(0.78);
+    const roofMat = new THREE.MeshLambertMaterial({ color: rc });
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(bw+0.1, 0.55, bd+0.1), roofMat);
+    roof.position.set(bx, bh + 0.27, bz);
+    roof.castShadow = true;
+    scene.add(roof);
+
+    // Window rows (2 faces only, simple coloured strips)
+    const winMat = new THREE.MeshLambertMaterial({ color: 0x88AABB, emissive: 0x112233 });
+    const rows = Math.max(1, Math.floor(bh/5));
+    const cols = Math.max(1, Math.floor(bw/4));
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const wx = bx - bw/2 + (c+1)*bw/(cols+1);
+        const wy = 2.5 + r*(bh-3)/rows;
+        const wz = bz + bd/2 + 0.05;
+        const w  = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.4, 0.12), winMat);
+        w.position.set(wx, wy, wz);
+        scene.add(w);
+      }
+    }
+  }
+}
+
+// Block zones (carefully outside road bands)
+// N of main ave (z < -9), S of main ave (z > 9)
+// W of center (x < -8), E of center (x > 8)
+placeBuildings(-210, -145, -155, -98,  7);  // far NW
+placeBuildings(-210, -145,  -96,  -9,  8);  // NW inner
+placeBuildings(-122,   -9,  -96,  -9, 10);  // N center
+placeBuildings(    9,  120,  -96,  -9,  9); // NE inner
+placeBuildings(  135,  210,  -96,  -9,  7); // far NE
+
+placeBuildings(-210, -145,    9,  86,  7);  // SW outer
+placeBuildings(-122,   -9,    9,  86, 10);  // S center (market district)
+placeBuildings(    9,  120,    9,  86,  9); // SE inner
+placeBuildings(  135,  210,    9,  86,  7); // far SE
+
+placeBuildings(-210, -145,  -98, -155,  5); // deep NW
+placeBuildings(  135,  210,   98,  155,  5); // deep SE
+placeBuildings(    9,  120,  -98, -155,  6); // deep N
+placeBuildings(-122,   -9,   98,  155,  6); // deep S
+
+// ── Trees ─────────────────────────────────────────────────
+function placeTree(x, z) {
+  const trunkMat = new THREE.MeshLambertMaterial({ color:0x4A2F1A });
+  const leafMat  = new THREE.MeshLambertMaterial({ color:0x2A6628 });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 2.8, 8), trunkMat);
+  trunk.position.set(x, 1.4, z);
+  trunk.castShadow = true;
+  scene.add(trunk);
+  // Two overlapping cones for a fuller tree
+  [0, 1.8].forEach((yo, i) => {
+    const r = 2.4 - i*0.6, h = 4.5 - i*1;
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(r, h, 8), leafMat);
+    cone.position.set(x, 4.5 + yo, z);
+    cone.castShadow = true;
+    scene.add(cone);
+  });
+}
+
+// Trees lining Avenue de la Paix
+for (let i = -9; i <= 9; i++) {
+  if (Math.abs(i) < 2) continue;
+  placeTree(i * 22, -10);
+  placeTree(i * 22,  10);
+}
+// Trees lining Rue Nyamirambo
+for (let j = -7; j <= 7; j++) {
+  if (Math.abs(j) < 2) continue;
+  placeTree(-10, j * 20);
+  placeTree( 10, j * 20);
+}
+
+// ── Street Lights ─────────────────────────────────────────
+function placeLight(x, z) {
+  const poleMat = new THREE.MeshLambertMaterial({ color:0x6A6A6A });
+  const lampMat = new THREE.MeshLambertMaterial({ color:0xFFEE88, emissive:0xFFDD44, emissiveIntensity:0.8 });
+  const g = new THREE.Group();
+  // Pole
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 7, 8), poleMat);
+  pole.position.y = 3.5; pole.castShadow = true;
+  g.add(pole);
+  // Arm
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 2.0), poleMat);
+  arm.position.set(0, 7.1, 1.0);
+  g.add(arm);
+  // Lamp globe
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), lampMat);
+  lamp.position.set(0, 6.8, 2.0);
+  g.add(lamp);
+  g.position.set(x, 0, z);
+  scene.add(g);
+}
+
+[-176,-110,-44,22,88,154].forEach(x => { placeLight(x,-11); placeLight(x, 11); });
+[-100,-60,-20,20,60,100].forEach(z => { placeLight(-11,z); placeLight( 11,z); });
+
+// ═══════════════════════════════════════════════════════════
+//  PLAYER MOTO
+// ═══════════════════════════════════════════════════════════
+function buildMoto() {
+  const g = new THREE.Group();
+
+  // Chassis (red — iconic Rwanda moto taxi)
+  const chassisMat = new THREE.MeshLambertMaterial({ color:0xBB1111 });
+  const darkMat    = new THREE.MeshLambertMaterial({ color:0x1A1A1A });
+  const chromeMat  = new THREE.MeshLambertMaterial({ color:0xCCCCCC });
+
+  // Lower engine block
+  addBox(g, 1.7, 0.45, 0.80, 0, 0.22, 0, darkMat);
+  // Body / tank
+  addBox(g, 1.5, 0.65, 0.78, -0.05, 0.72, 0, chassisMat);
+  // Seat
+  addBox(g, 0.9, 0.18, 0.68, -0.3, 1.08, 0, darkMat);
+  // Front fairing
+  addBox(g, 0.32, 0.52, 0.72, 0.80, 0.78, 0, chassisMat);
+  // Mudguards
+  addBox(g, 0.55, 0.12, 0.82,  0.80, 0.20, 0, chassisMat);
+  addBox(g, 0.55, 0.12, 0.82, -0.80, 0.20, 0, chassisMat);
+
+  // Handlebars
+  const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 8), chromeMat);
+  hb.rotation.z = Math.PI/2; hb.position.set(0.72, 1.10, 0);
+  g.add(hb);
+  // Fork
+  const fork = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.72, 0.10), chromeMat);
+  fork.position.set(0.82, 0.56, 0); g.add(fork);
+  // Exhaust pipe
+  const ex = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.9, 8), chromeMat);
+  ex.rotation.z = Math.PI/2; ex.position.set(-0.45, 0.14, 0.38);
+  g.add(ex);
+  // Headlight
+  const hlMat = new THREE.MeshLambertMaterial({ color:0xFFFFCC, emissive:0xFFFF88, emissiveIntensity:1.2 });
+  const hl = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), hlMat);
+  hl.position.set(1.00, 0.82, 0); g.add(hl);
+  // Tail light
+  const tlMat = new THREE.MeshLambertMaterial({ color:0xFF2200, emissive:0xFF1100, emissiveIntensity:1.0 });
+  const tl = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.10, 0.60), tlMat);
+  tl.position.set(-0.95, 0.92, 0); g.add(tl);
+
+  // Wheels (cylinder rotated 90° on Z)
+  const wheelMat  = new THREE.MeshLambertMaterial({ color:0x111111 });
+  const rimMat    = new THREE.MeshLambertMaterial({ color:0xAAAAAA });
+  [0.85, -0.85].forEach(wx => {
+    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.19, 18), wheelMat);
+    wh.rotation.z = Math.PI/2; wh.position.set(wx, 0.44, 0);
+    wh.castShadow = true; g.add(wh);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.21, 12), rimMat);
+    rim.rotation.z = Math.PI/2; rim.position.set(wx, 0.44, 0);
+    g.add(rim);
+  });
+
+  // ── Rider ─────────────────────────────────────────────
+  const orangeMat  = new THREE.MeshLambertMaterial({ color:0xEE6600 }); // jacket
+  const jeansBlue  = new THREE.MeshLambertMaterial({ color:0x2244AA }); // trousers
+  const helmMat    = new THREE.MeshLambertMaterial({ color:0xFFCC00 }); // yellow helmet
+  const helmetVisor = new THREE.MeshLambertMaterial({ color:0x336688, emissive:0x112233 });
+  const skinMat    = new THREE.MeshLambertMaterial({ color:0x8B5E3C });
+
+  // Torso
+  addBox(g, 0.50, 0.72, 0.52, -0.12, 1.56, 0, orangeMat);
+  // Arms
+  addBox(g, 0.60, 0.18, 0.18, 0.18, 1.74, -0.32, orangeMat);
+  addBox(g, 0.60, 0.18, 0.18, 0.18, 1.74,  0.32, orangeMat);
+  // Legs
+  addBox(g, 0.60, 0.18, 0.18, 0.14, 1.08, -0.28, jeansBlue);
+  addBox(g, 0.60, 0.18, 0.18, 0.14, 1.08,  0.28, jeansBlue);
+  // Helmet
+  const helm = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 10), helmMat);
+  helm.position.set(-0.08, 2.05, 0); helm.castShadow = true; g.add(helm);
+  // Visor
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.46), helmetVisor);
+  visor.position.set(0.12, 2.02, 0); g.add(visor);
+
+  g.name = 'moto';
+  return g;
+}
+
+const moto = buildMoto();
+moto.position.set(8, 0, 2);
+moto.rotation.y = Math.PI; // faces west initially
+scene.add(moto);
+
+// Wheel refs for spinning animation
+const wheels = [];
+moto.traverse(c => {
+  if (c.isMesh && c.geometry.type === 'CylinderGeometry' && c.geometry.parameters.radiusTop > 0.3) {
+    wheels.push(c);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+//  TRAFFIC VEHICLES
+// ═══════════════════════════════════════════════════════════
+function buildVehicle(col, type) {
+  const g = new THREE.Group();
+  const mat  = new THREE.MeshLambertMaterial({ color: col });
+  const dark = new THREE.MeshLambertMaterial({ color:0x111111 });
+  const glassMat = new THREE.MeshLambertMaterial({ color:0x557799, transparent:true, opacity:0.7 });
+
+  if (type === 'bus') {
+    // Minibus (Twende vibes)
+    addBox(g, 5.0, 2.0, 2.1, 0, 1.3, 0, mat);
+    addBox(g, 4.8, 0.35, 2.05, 0, 2.35, 0, new THREE.MeshLambertMaterial({ color:0xFFFFFF }));
+    // Side windows
+    for (let i = -1.5; i <= 1.5; i += 1.2) {
+      addBox(g, 0.9, 0.55, 0.08, i, 1.55, -1.06, glassMat, false, false);
+      addBox(g, 0.9, 0.55, 0.08, i, 1.55,  1.06, glassMat, false, false);
+    }
+    addBox(g, 0.08, 0.55, 1.5, -2.52, 1.55, 0, glassMat, false, false); // rear glass
+  } else if (type === 'suv') {
+    addBox(g, 4.5, 1.3, 2.0, 0, 0.9, 0, mat);
+    addBox(g, 3.5, 0.9, 1.9, -0.2, 1.95, 0, mat);
+    addBox(g, 0.08, 0.65, 1.6, -2.0, 1.62, 0, glassMat, false, false);
+  } else {
+    // Sedan
+    addBox(g, 4.0, 1.0, 1.85, 0, 0.78, 0, mat);
+    addBox(g, 2.4, 0.80, 1.75, -0.25, 1.72, 0, mat);
+    addBox(g, 0.08, 0.6, 1.4, -2.05, 1.5, 0, glassMat, false, false);
+  }
+
+  // Wheels x4
+  const wGeo = new THREE.CylinderGeometry(0.40, 0.40, 0.22, 14);
+  [[1.35,-0.88],[1.35,0.88],[-1.35,-0.88],[-1.35,0.88]].forEach(([wx,wz]) => {
+    const w = new THREE.Mesh(wGeo, dark);
+    w.rotation.z = Math.PI/2; w.position.set(wx, 0.40, wz);
+    w.castShadow = true; g.add(w);
+  });
+
+  // Headlights / taillights
+  const hlMat = new THREE.MeshLambertMaterial({ color:0xFFFFCC, emissive:0xFFFF88 });
+  const tlMat = new THREE.MeshLambertMaterial({ color:0xFF1100, emissive:0xFF0000 });
+  addBox(g, 0.08, 0.20, 0.35,  2.02, 0.88, -0.6, hlMat, false, false);
+  addBox(g, 0.08, 0.20, 0.35,  2.02, 0.88,  0.6, hlMat, false, false);
+  addBox(g, 0.08, 0.18, 0.30, -2.02, 0.88, -0.6, tlMat, false, false);
+  addBox(g, 0.08, 0.18, 0.30, -2.02, 0.88,  0.6, tlMat, false, false);
+
+  g.castShadow = true;
+  return g;
+}
+
+// Traffic definitions: [startX, startZ, route[[x,z],...], speed, color, type, laneOffset]
+const TRAFFIC_DEFS = [
+  { route:[[-215,0],[215,0]], sp:0.16, col:0x2255AA, type:'sedan',  lane: 3.5 },
+  { route:[[215,0],[-215,0]], sp:0.13, col:0xEEEEDD, type:'bus',    lane:-3.5 },
+  { route:[[0,-155],[0,155]], sp:0.18, col:0xFF8800, type:'sedan',  lane: 3.0 },
+  { route:[[0,155],[0,-155]], sp:0.15, col:0x228833, type:'suv',    lane:-3.0 },
+  { route:[[-140,-90],[180,-90]], sp:0.14, col:0xCC4444, type:'bus', lane: 3.2 },
+  { route:[[180,-90],[-140,-90]], sp:0.12, col:0x9944BB, type:'sedan', lane:-3.2 },
+  { route:[[-120,92],[100,92]], sp:0.17, col:0x44AACC, type:'sedan', lane: 3.0 },
+  { route:[[100,92],[-120,92]], sp:0.11, col:0xDDAA22, type:'suv',  lane:-3.0 },
+];
+
+const trafficCars = TRAFFIC_DEFS.map(def => {
+  const car = buildVehicle(def.col, def.type);
+  car.position.set(def.route[0][0], 0, def.route[0][1]);
+  car.userData = { route: def.route, rIdx:0, t:0, sp:def.sp, lane:def.lane };
+  scene.add(car);
+  return car;
+});
+
+// ═══════════════════════════════════════════════════════════
+//  MISSION MARKERS
+// ═══════════════════════════════════════════════════════════
+const MISSIONS = [
+  { pu:{x: 35,z:  -3,name:'Nyamirambo Market'},   do:{x:-60,z:-92,name:'Mosque Corner'},       tip:1500 },
+  { pu:{x:-75,z:   4,name:'Biryogo Junction'},     do:{x:140,z: -3,name:'KBC Hill'},             tip:2000 },
+  { pu:{x:165,z: -92,name:'Stade Road East'},      do:{x:-95,z: 94,name:'Muhima Junction'},      tip:1800 },
+  { pu:{x:-135,z:-58,name:'Muhima Road'},          do:{x: 35,z:  2,name:'Nyamirambo Market'},   tip:1600 },
+  { pu:{x: 90,z:  94,name:'Biryogo Heights'},      do:{x:-95,z:-92,name:'Stadium North'},        tip:2500 },
+  { pu:{x:-95,z:  94,name:'Stadium South'},        do:{x:155,z: 94,name:'KBC Heights'},          tip:3000 },
+];
+
+function makePulse(color) {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshLambertMaterial({ color, emissive:color, emissiveIntensity:0.6 });
+  // Ground ring
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.22, 8, 40), mat);
+  ring.rotation.x = Math.PI/2; g.add(ring);
+  // Vertical pole
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 6, 8), mat);
+  pole.position.y = 3; g.add(pole);
+  // Top beacon
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 6), mat);
+  beacon.position.y = 6.2; g.add(beacon);
+  // Arrow cone pointing down
+  const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.5, 8), mat);
+  arrow.rotation.x = Math.PI; arrow.position.y = 4.8; g.add(arrow);
+  return g;
+}
+
+let pickupMarker = null, dropoffMarker = null;
+
+function setMarkers(missionIdx, phase) {
+  if (pickupMarker)  { scene.remove(pickupMarker);  pickupMarker  = null; }
+  if (dropoffMarker) { scene.remove(dropoffMarker); dropoffMarker = null; }
+  const m = MISSIONS[missionIdx];
+  if (phase === 'PICKUP') {
+    pickupMarker = makePulse(0x00FF88);
+    pickupMarker.position.set(m.pu.x, 0, m.pu.z);
+    scene.add(pickupMarker);
+    document.getElementById('mission-text').textContent = `🏃 Pick up · ${m.pu.name}`;
+  } else {
+    dropoffMarker = makePulse(0xFFD700);
+    dropoffMarker.position.set(m.do.x, 0, m.do.z);
+    scene.add(dropoffMarker);
+    document.getElementById('mission-text').textContent = `📍 Drop off · ${m.do.name}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GAME STATE
+// ═══════════════════════════════════════════════════════════
+let gameRunning  = false;
+let missionIdx   = 0;
+let phase        = 'PICKUP';
+let currentTip   = 0;
+let totalEarned  = 0;
+let crashCooldown = 0;
+let tipDecay     = null;
+let camMode      = '3rd'; // '3rd' | '1st'
+
+// Camera smooth state
+const cam3Target = new THREE.Vector3();
+const cam3Pos    = new THREE.Vector3();
+
+// ── Controls ──────────────────────────────────────────────
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'KeyV') toggleCam();
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// Joystick
+let joyActive = false, joyX = 0, joyY = 0;
+const JOY_R = 37;
+const joyBase = document.getElementById('joy-base');
+const joyKnob = document.getElementById('joy-knob');
+joyBase.addEventListener('touchstart', e => { joyActive=true; e.preventDefault(); }, {passive:false});
+joyBase.addEventListener('touchend',   () => { joyActive=false; joyX=0; joyY=0; joyKnob.style.transform=''; });
+joyBase.addEventListener('touchmove',  e => {
+  e.preventDefault();
+  const r = joyBase.getBoundingClientRect();
+  let dx = e.touches[0].clientX - (r.left + r.width/2);
+  let dy = e.touches[0].clientY - (r.top  + r.height/2);
+  const d = Math.sqrt(dx*dx+dy*dy);
+  if (d > JOY_R) { dx=dx/d*JOY_R; dy=dy/d*JOY_R; }
+  joyX = dx/JOY_R; joyY = dy/JOY_R;
+  joyKnob.style.transform = `translate(${dx}px,${dy}px)`;
+}, {passive:false});
+
+// ── Moto physics state ────────────────────────────────────
+let motoSpeed = 0;
+
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  gameRunning = true;
+  missionIdx  = 0;
+  phase       = 'PICKUP';
+  totalEarned = 0;
+  buildProgressDots();
+  setMarkers(0, 'PICKUP');
+  currentTip = MISSIONS[0].tip;
+  updateHUD();
+}
+
+function toggleCam() {
+  camMode = camMode === '3rd' ? '1st' : '3rd';
+  document.getElementById('cam-btn').textContent =
+    camMode === '3rd' ? '👁 1ST PERSON' : '🎥 3RD PERSON';
+}
+
+function buildProgressDots() {
+  const wrap = document.getElementById('progress');
+  wrap.innerHTML = '';
+  MISSIONS.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i===0 ? ' active' : '');
+    d.id = `dot-${i}`;
+    wrap.appendChild(d);
+  });
+}
+
+function refreshDots() {
+  MISSIONS.forEach((_, i) => {
+    const d = document.getElementById(`dot-${i}`);
+    if (!d) return;
+    d.className = 'dot' + (i < missionIdx ? ' done' : i===missionIdx ? ' active' : '');
+  });
+}
+
+function updateHUD() {
+  if (phase === 'DROPOFF') {
+    document.getElementById('tip-val').textContent = currentTip.toLocaleString() + ' RWF ⏱';
+    document.getElementById('tip-val').style.color = '#FFD700';
+  } else {
+    document.getElementById('tip-val').textContent = totalEarned.toLocaleString() + ' RWF earned';
+    document.getElementById('tip-val').style.color = '#00ff88';
+  }
+}
+
+// ── Traffic update ────────────────────────────────────────
+function updateTraffic(dt) {
+  trafficCars.forEach(car => {
+    const ud  = car.userData;
+    const rt  = ud.route;
+    const from = rt[ud.rIdx % rt.length];
+    const to   = rt[(ud.rIdx+1) % rt.length];
+    const dx = to[0]-from[0], dz = to[1]-from[1];
+    const len = Math.sqrt(dx*dx+dz*dz);
+    ud.t += ud.sp * dt / len;
+    if (ud.t >= 1) { ud.t=0; ud.rIdx=(ud.rIdx+1)%rt.length; return; }
+    const cx = from[0]+dx*ud.t;
+    const cz = from[1]+dz*ud.t;
+    // Perpendicular offset for lane separation
+    const plen = len||1;
+    car.position.set(
+      cx + (-dz/plen)*ud.lane,
+      0,
+      cz + ( dx/plen)*ud.lane
+    );
+    car.rotation.y = Math.atan2(dx, dz);
+  });
+}
+
+// ── Mission / crash check ─────────────────────────────────
+function checkMissions() {
+  const m = MISSIONS[missionIdx];
+  const px = moto.position.x, pz = moto.position.z;
+
+  if (phase === 'PICKUP') {
+    const d = Math.hypot(px-m.pu.x, pz-m.pu.z);
+    if (d < PICKUP_RAD) {
+      phase = 'DROPOFF';
+      currentTip = m.tip;
+      if (tipDecay) clearInterval(tipDecay);
+      tipDecay = setInterval(() => {
+        currentTip = Math.max(100, currentTip - 30);
+        updateHUD();
+      }, 1000);
+      setMarkers(missionIdx, 'DROPOFF');
+      updateHUD();
+    }
+  } else {
+    const d = Math.hypot(px-m.do.x, pz-m.do.z);
+    if (d < PICKUP_RAD) {
+      totalEarned += currentTip;
+      if (tipDecay) clearInterval(tipDecay);
+      missionIdx++;
+      if (missionIdx >= MISSIONS.length) { showWin(); return; }
+      phase = 'PICKUP';
+      refreshDots();
+      setMarkers(missionIdx, 'PICKUP');
+      currentTip = MISSIONS[missionIdx].tip;
+      updateHUD();
+    }
+  }
+}
+
+function checkCrash() {
+  if (crashCooldown > 0) { crashCooldown--; return; }
+  for (const car of trafficCars) {
+    if (Math.hypot(moto.position.x-car.position.x, moto.position.z-car.position.z) < CRASH_RAD) {
+      motoSpeed *= -0.35;
+      if (phase === 'DROPOFF') { currentTip = Math.max(100, currentTip-200); updateHUD(); }
+      crashCooldown = 70;
+      const f = document.getElementById('crash-flash');
+      f.style.transition = 'opacity 0s';
+      f.style.opacity = 1;
+      setTimeout(() => { f.style.transition='opacity 0.25s'; f.style.opacity=0; }, 80);
+      break;
+    }
+  }
+}
+
+// ── Win screen ────────────────────────────────────────────
+function showWin() {
+  gameRunning = false;
+  const win = document.createElement('div');
+  win.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.88);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    z-index:200;color:#fff;font-family:'Arial Black','Arial',sans-serif;
+  `;
+  win.innerHTML = `
+    <div style="font-size:64px;margin-bottom:12px">🏆</div>
+    <h2 style="font-size:38px;letter-spacing:-1px;margin-bottom:8px">Shift Complete!</h2>
+    <p style="font-size:24px;color:#FFD700;margin-bottom:8px">
+      ${totalEarned.toLocaleString()} RWF earned
+    </p>
+    <p style="opacity:0.5;margin-bottom:36px;font-size:14px">
+      Stage 3 coming: Cars · Kigali City · KLA · NBO
+    </p>
+    <button onclick="location.reload()" style="
+      background:#00ff88;color:#000;border:none;
+      padding:15px 48px;font-size:17px;font-weight:900;
+      border-radius:10px;cursor:pointer;letter-spacing:1px;
+    ">RIDE AGAIN</button>
+  `;
+  document.body.appendChild(win);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GAME LOOP
+// ═══════════════════════════════════════════════════════════
+let lastTS = null;
+
+function loop(ts) {
+  requestAnimationFrame(loop);
+  const dt = lastTS ? Math.min((ts - lastTS) / 16.67, 3) : 1;
+  lastTS = ts;
+
+  if (!gameRunning) { renderer.render(scene, camera); return; }
+
+  const t = ts * 0.001;
+
+  // ── Animate markers ────────────────────────
+  if (pickupMarker)  { pickupMarker.position.y  = Math.sin(t*3)*0.18;    pickupMarker.rotation.y  += 0.022*dt; }
+  if (dropoffMarker) { dropoffMarker.position.y = Math.sin(t*3+1)*0.18;  dropoffMarker.rotation.y += 0.022*dt; }
+
+  // ── Input ─────────────────────────────────
+  const fwd   = keys['KeyW']||keys['ArrowUp']   || (joyActive && joyY < -0.25);
+  const back   = keys['KeyS']||keys['ArrowDown'] || (joyActive && joyY >  0.25);
+  const left   = keys['KeyA']||keys['ArrowLeft'] || (joyActive && joyX < -0.25);
+  const right  = keys['KeyD']||keys['ArrowRight']|| (joyActive && joyX >  0.25);
+  const braking = keys['Space'];
+
+  const accel = fwd ? 1 : back ? -0.45 : 0;
+  const steer = left ? 1 : right ? -1 : 0;
+
+  motoSpeed += accel * ACCEL * dt;
+  if (braking) motoSpeed *= 0.72;
+  motoSpeed *= Math.pow(FRICTION, dt);
+  motoSpeed = Math.max(-MAX_SPEED*0.35, Math.min(MAX_SPEED, motoSpeed));
+
+  const speedAbs = Math.abs(motoSpeed);
+  if (speedAbs > 0.004) {
+    moto.rotation.y += steer * TURN_SPD * (speedAbs/MAX_SPEED) * dt;
+  }
+
+  const dir = new THREE.Vector3(Math.sin(moto.rotation.y), 0, Math.cos(moto.rotation.y));
+  moto.position.addScaledVector(dir, motoSpeed * dt);
+  moto.position.y = 0;
+
+  // Wheel spin
+  wheels.forEach(w => { w.rotation.y += motoSpeed * 2.6 * dt; });
+
+  // ── Moto tilt (lean into turns) ────────────
+  const targetLean = -steer * (speedAbs/MAX_SPEED) * 0.18;
+  moto.rotation.z += (targetLean - moto.rotation.z) * 0.12 * dt;
+
+  // ── Traffic ───────────────────────────────
+  updateTraffic(dt);
+
+  // ── Collision / Missions ──────────────────
+  checkCrash();
+  checkMissions();
+
+  // ── Speedo ────────────────────────────────
+  const kmh = speedAbs * 220;
+  document.getElementById('speed-num').textContent = Math.round(kmh);
+
+  // ── Camera ────────────────────────────────
+  if (camMode === '3rd') {
+    // Third-person chase cam — floats behind and above, looks ahead
+    const camDist = CAM3_DIST + speedAbs * 10;
+    const camH    = CAM3_H    + speedAbs * 5;
+    const ideal = moto.position.clone().add(
+      new THREE.Vector3(-dir.x*camDist, camH, -dir.z*camDist)
+    );
+    cam3Pos.lerp(ideal, CAM_LAG * dt);
+    camera.position.copy(cam3Pos);
+
+    const lookAt = moto.position.clone().addScaledVector(dir, 6).add(new THREE.Vector3(0, 1.2, 0));
+    cam3Target.lerp(lookAt, 0.12 * dt);
+    camera.lookAt(cam3Target);
+
+  } else {
+    // First-person — helmet cam
+    const helmPos = moto.position.clone().add(
+      new THREE.Vector3(dir.x*-0.08, 2.15, dir.z*-0.08)
+    );
+    camera.position.copy(helmPos);
+    const fp_look = helmPos.clone().addScaledVector(dir, 12).add(new THREE.Vector3(0, -0.3, 0));
+    camera.lookAt(fp_look);
+    camera.rotation.z = moto.rotation.z * 1.4; // exaggerate lean in FP
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ── Resize ─────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
