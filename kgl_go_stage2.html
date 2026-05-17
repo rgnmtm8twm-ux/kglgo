@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <title>KGL GO — Stage 2</title>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html, body { width:100%; height:100%; overflow:hidden; background:#081510; }
+    body { font-family:-apple-system,'Segoe UI',Helvetica,sans-serif; }
+
+    #map { width:100%; height:100%; }
+    .maplibregl-canvas { filter:invert(0.95) brightness(0.42) contrast(1.08) saturate(0.75); }
+    .maplibregl-ctrl-group, .maplibregl-ctrl-logo { display:none !important; }
+    .maplibregl-ctrl-attrib { background:rgba(8,21,16,0.7)!important; color:#334d3e!important; font-size:9px!important; }
+
+    /* ── HUD top ── */
+    #hud {
+      position:absolute; top:0; left:0; right:0;
+      display:flex; justify-content:space-between; align-items:flex-start;
+      padding:14px 16px; pointer-events:none; z-index:10; gap:8px;
+    }
+    .hud-pill {
+      background:rgba(8,21,16,0.9); border:1.5px solid #2E7D5E;
+      border-radius:50px; padding:8px 18px;
+      backdrop-filter:blur(10px); flex-shrink:0;
+    }
+    .hud-pill .lbl { font-size:9px; color:#5A9478; text-transform:uppercase; letter-spacing:1.5px; }
+    .hud-pill .val { font-size:20px; font-weight:800; color:#D4A017; line-height:1.2; }
+    .hud-center {
+      background:rgba(8,21,16,0.9); border:1.5px solid #D4A017;
+      border-radius:50px; padding:8px 20px; text-align:center;
+      backdrop-filter:blur(10px); flex-shrink:0;
+    }
+    .hud-center .t1 { font-size:13px; font-weight:900; color:#D4A017; letter-spacing:3px; }
+    .hud-center .t2 { font-size:9px; color:#5A9478; letter-spacing:3px; }
+
+    /* ── Mission bar ── */
+    #mission-bar {
+      position:absolute; top:76px; left:50%; transform:translateX(-50%);
+      background:rgba(8,21,16,0.9); border:1.5px solid #2E7D5E;
+      border-radius:50px; padding:9px 22px;
+      pointer-events:none; z-index:10; text-align:center;
+      backdrop-filter:blur(10px); white-space:nowrap;
+      max-width:90vw; overflow:hidden; text-overflow:ellipsis;
+    }
+    #mission-bar .m-label { font-size:9px; color:#5A9478; text-transform:uppercase; letter-spacing:1.5px; }
+    #mission-bar .m-text  { font-size:13px; font-weight:700; color:#C8E6D8; margin-top:1px; }
+
+    /* ── Carrying bar (shown when passenger on board) ── */
+    #carry-bar {
+      position:absolute; top:130px; left:50%; transform:translateX(-50%);
+      background:rgba(212,160,23,0.15); border:1.5px solid #D4A017;
+      border-radius:50px; padding:8px 22px;
+      pointer-events:none; z-index:10; text-align:center;
+      backdrop-filter:blur(10px); display:none;
+    }
+    #carry-bar .c-label { font-size:9px; color:#D4A017; text-transform:uppercase; letter-spacing:1.5px; }
+    #carry-bar .c-tip   { font-size:18px; font-weight:800; color:#D4A017; line-height:1.2; }
+
+    /* ── Speed bar ── */
+    #speed-wrap {
+      position:absolute; bottom:24px; right:16px;
+      background:rgba(8,21,16,0.85); border:1.5px solid #2E7D5E;
+      border-radius:12px; padding:10px 14px; pointer-events:none;
+      z-index:10; backdrop-filter:blur(8px); min-width:80px;
+    }
+    #speed-wrap .sp-label { font-size:9px; color:#5A9478; text-transform:uppercase; letter-spacing:1.5px; }
+    #speed-bar-track {
+      width:100%; height:6px; background:#0D2A1A;
+      border-radius:3px; margin-top:4px; overflow:hidden;
+    }
+    #speed-bar-fill {
+      height:100%; width:0%; border-radius:3px;
+      background:linear-gradient(90deg,#2E7D5E,#D4A017);
+      transition:width 0.1s, background 0.1s;
+    }
+    #speed-val { font-size:11px; color:#C8E6D8; margin-top:3px; font-weight:600; }
+
+    /* ── Toast ── */
+    #toast {
+      position:absolute; bottom:90px; left:50%;
+      transform:translateX(-50%) translateY(4px);
+      background:#D4A017; color:#081510;
+      padding:11px 26px; border-radius:50px;
+      font-weight:800; font-size:14px;
+      opacity:0; transition:opacity 0.2s,transform 0.2s;
+      pointer-events:none; white-space:nowrap; z-index:20;
+      max-width:92vw; overflow:hidden; text-overflow:ellipsis;
+    }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.crash { background:#C0392B; color:white; }
+
+    /* ── Joystick ── */
+    #joy-zone {
+      position:absolute; bottom:30px; left:24px;
+      width:110px; height:110px; z-index:15; touch-action:none;
+    }
+    #joy-base {
+      width:100%; height:100%;
+      background:rgba(8,21,16,0.65); border:2px solid #2E7D5E;
+      border-radius:50%; position:relative;
+    }
+    #joy-thumb {
+      width:46px; height:46px;
+      background:radial-gradient(circle at 35% 35%,#2E7D5E,#1A5F47);
+      border:2px solid #D4A017; border-radius:50%;
+      position:absolute; top:50%; left:50%;
+      transform:translate(-50%,-50%); transition:transform 0.06s;
+    }
+
+    /* ── Markers ── */
+    .player-el {
+      width:40px; height:40px;
+      background:radial-gradient(circle at 40% 35%,#2E7D5E,#1A5F47);
+      border:3px solid #D4A017; border-radius:50%;
+      display:flex; align-items:center; justify-content:center; font-size:20px;
+      box-shadow:0 0 0 6px rgba(212,160,23,0.18),0 2px 10px rgba(0,0,0,0.6);
+      transition:box-shadow 0.15s;
+    }
+    .player-el.carrying {
+      border-color:#02C39A;
+      box-shadow:0 0 0 6px rgba(2,195,154,0.25),0 2px 10px rgba(0,0,0,0.6);
+    }
+    .pickup-el {
+      width:36px; height:36px; background:#D4A017;
+      border:2.5px solid #fff; border-radius:50%;
+      display:flex; align-items:center; justify-content:center; font-size:18px;
+      animation:pax-pulse 2s ease-out infinite;
+      box-shadow:0 2px 8px rgba(0,0,0,0.4);
+    }
+    .dropoff-el {
+      width:36px; height:36px; background:#02C39A;
+      border:2.5px solid #fff; border-radius:50%;
+      display:flex; align-items:center; justify-content:center; font-size:18px;
+      animation:drop-pulse 1.4s ease-out infinite;
+      box-shadow:0 2px 8px rgba(0,0,0,0.4);
+    }
+    .traffic-el {
+      font-size:22px; cursor:default;
+      filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    }
+    @keyframes pax-pulse {
+      0%  { box-shadow:0 0 0 0 rgba(212,160,23,0.9),0 2px 8px rgba(0,0,0,0.4); }
+      70% { box-shadow:0 0 0 14px rgba(212,160,23,0),0 2px 8px rgba(0,0,0,0.4); }
+      100%{ box-shadow:0 0 0 0 rgba(212,160,23,0),0 2px 8px rgba(0,0,0,0.4); }
+    }
+    @keyframes drop-pulse {
+      0%  { box-shadow:0 0 0 0 rgba(2,195,154,0.9),0 2px 8px rgba(0,0,0,0.4); }
+      70% { box-shadow:0 0 0 16px rgba(2,195,154,0),0 2px 8px rgba(0,0,0,0.4); }
+      100%{ box-shadow:0 0 0 0 rgba(2,195,154,0),0 2px 8px rgba(0,0,0,0.4); }
+    }
+
+    /* ── Crash flash ── */
+    #crash-flash {
+      position:absolute; inset:0; background:rgba(192,57,43,0.35);
+      pointer-events:none; z-index:50; opacity:0; transition:opacity 0.1s;
+    }
+    #crash-flash.on { opacity:1; }
+
+    /* ── Start screen ── */
+    #start-screen {
+      position:absolute; inset:0;
+      background:radial-gradient(ellipse at 50% 60%,#0d2a1a 0%,#060e0a 100%);
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      z-index:100; padding:24px;
+    }
+    .ss-icon { font-size:72px; animation:bob 2s ease-in-out infinite; margin-bottom:12px; }
+    @keyframes bob { 0%,100%{transform:translateY(0) scale(1);} 50%{transform:translateY(-10px) scale(1.06);} }
+    .ss-badge {
+      background:rgba(2,195,154,0.15); border:1.5px solid #02C39A;
+      color:#02C39A; padding:5px 16px; border-radius:50px; font-size:11px;
+      font-weight:700; letter-spacing:2px; text-transform:uppercase; margin-bottom:10px;
+    }
+    .ss-title  { font-size:54px; font-weight:900; color:#D4A017; letter-spacing:-1px; line-height:1; }
+    .ss-sub    { font-size:14px; color:#C8E6D8; margin-top:4px; letter-spacing:6px; text-transform:uppercase; }
+    .ss-unlock {
+      margin-top:20px; background:rgba(46,125,94,0.15);
+      border:1.5px solid #2E7D5E; border-radius:14px;
+      padding:16px 24px; max-width:300px; text-align:center;
+    }
+    .ss-unlock .ul { font-size:10px; color:#3D5E4A; text-transform:uppercase; letter-spacing:2px; }
+    .ss-unlock .uv { font-size:16px; font-weight:700; color:#C8E6D8; margin-top:6px; }
+    .ss-unlock .ud { font-size:12px; color:#3D5E4A; margin-top:4px; line-height:1.4; }
+    .ss-stats  { margin-top:16px; display:flex; gap:10px; }
+    .ss-stat   { background:rgba(46,125,94,0.12); border:1px solid #1E4D35; border-radius:10px; padding:10px 14px; text-align:center; }
+    .ss-stat .sv { font-size:20px; font-weight:800; color:#D4A017; }
+    .ss-stat .sk { font-size:10px; color:#3D5E4A; text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+    .ss-btn {
+      margin-top:24px; background:#D4A017; color:#081510;
+      border:none; padding:17px 52px; border-radius:50px;
+      font-size:17px; font-weight:900; cursor:pointer;
+      letter-spacing:2px; text-transform:uppercase;
+      transition:background 0.15s,transform 0.1s;
+      box-shadow:0 4px 24px rgba(212,160,23,0.35);
+    }
+    .ss-btn:hover  { background:#E8B820; transform:scale(1.03); }
+    .ss-btn:active { transform:scale(0.97); }
+    .ss-hint { margin-top:14px; color:#2A4035; font-size:12px; text-align:center; line-height:1.6; }
+
+    /* ── Win / Game Over overlay ── */
+    .full-overlay {
+      display:none; position:absolute; inset:0;
+      background:radial-gradient(ellipse at 50% 60%,#0d2a1a 0%,#060e0a 100%);
+      flex-direction:column; align-items:center; justify-content:center;
+      z-index:100; text-align:center; padding:24px;
+    }
+    .full-overlay.active { display:flex; }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="crash-flash"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-pill">
+    <div class="lbl">Tips Earned</div>
+    <div class="val" id="tips-val">0 RWF</div>
+  </div>
+  <div class="hud-center">
+    <div class="t1">KGL</div>
+    <div class="t2">GO</div>
+  </div>
+  <div class="hud-pill" style="text-align:right">
+    <div class="lbl">Mission</div>
+    <div class="val" id="mission-val">1 / 6</div>
+  </div>
+</div>
+
+<!-- Mission bar -->
+<div id="mission-bar">
+  <div class="m-label">🛵 Ride to</div>
+  <div class="m-text" id="mission-text">Loading…</div>
+</div>
+
+<!-- Carry bar -->
+<div id="carry-bar">
+  <div class="c-label">🧑 On board — deliver fast!</div>
+  <div class="c-tip" id="carry-tip">0 RWF</div>
+</div>
+
+<!-- Speed -->
+<div id="speed-wrap">
+  <div class="sp-label">Speed</div>
+  <div id="speed-bar-track"><div id="speed-bar-fill"></div></div>
+  <div id="speed-val">0 km/h</div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Joystick -->
+<div id="joy-zone"><div id="joy-base"><div id="joy-thumb"></div></div></div>
+
+<!-- Start screen -->
+<div id="start-screen">
+  <div class="ss-badge">Stage 2 Unlocked</div>
+  <div class="ss-icon">🛵</div>
+  <div class="ss-title">KGL GO</div>
+  <div class="ss-sub">Moto Mode</div>
+  <div class="ss-unlock">
+    <div class="ul">New in Stage 2</div>
+    <div class="uv">⚡ Moto Physics + Traffic</div>
+    <div class="ud">
+      Pick up passengers · Deliver fast · Tip decays with time<br>
+      Dodge traffic or lose your passenger
+    </div>
+  </div>
+  <div class="ss-stats">
+    <div class="ss-stat"><div class="sv">6</div><div class="sk">Missions</div></div>
+    <div class="ss-stat"><div class="sv">4</div><div class="sk">Traffic Cars</div></div>
+    <div class="ss-stat"><div class="sv">12K</div><div class="sk">Max RWF</div></div>
+  </div>
+  <button class="ss-btn" id="start-btn">🛵  Ride</button>
+  <div class="ss-hint">Arrow keys / WASD · Hold for speed · Momentum physics<br>Mobile: use the joystick</div>
+</div>
+
+<!-- Win screen -->
+<div class="full-overlay" id="end-screen"></div>
+
+<script>
+'use strict';
+
+/* ════════════════════════════════════════════════
+   CONFIG
+════════════════════════════════════════════════ */
+const CENTER        = [30.0466, -1.9874];
+const ZOOM          = 16.8;
+const PITCH         = 50;
+const BEARING       = -18;
+const MAX_VEL       = 0.00021;    // max speed in degrees/frame
+const ACCEL         = 0.000020;   // throttle acceleration
+const FRICTION_ON   = 0.89;       // friction while key held
+const FRICTION_OFF  = 0.80;       // harder brake when no key
+const LNG_FACTOR    = 0.78;
+const PICKUP_RAD    = 0.00024;    // ~26m pickup/dropoff radius
+const CRASH_RAD     = 0.00014;    // ~15m crash radius
+const CAM_DURATION  = 90;
+const TIP_DECAY_SEC = 25;         // RWF lost per second while carrying
+
+/* Speed → km/h conversion (rough, at Kigali latitude) */
+const VEL_TO_KMH = 111000 * 60 * 60 / 1000; // 1 deg/frame@60fps → km/h
+
+/* ════════════════════════════════════════════════
+   MISSIONS
+════════════════════════════════════════════════ */
+const MISSIONS = [
+  {
+    pickup:  { lng:30.0455, lat:-1.9862, name:'Nyamirambo Market',    emoji:'👩' },
+    dropoff: { lng:30.0481, lat:-1.9847, name:'Mosque Corner',         emoji:'🕌' },
+    baseTip: 1500, desc:'Lady needs to reach the mosque — hurry!'
+  },
+  {
+    pickup:  { lng:30.0443, lat:-1.9896, name:'Biryogo Junction',      emoji:'👨' },
+    dropoff: { lng:30.0508, lat:-1.9856, name:'KBC Hill',              emoji:'📺' },
+    baseTip: 2000, desc:'Guy\'s late for work up KBC Hill'
+  },
+  {
+    pickup:  { lng:30.0494, lat:-1.9874, name:'Avenue de la Paix',     emoji:'👵' },
+    dropoff: { lng:30.0472, lat:-1.9910, name:'Stadium Road',          emoji:'🏟️' },
+    baseTip: 1800, desc:'Mama\'s going to the match — she paid extra'
+  },
+  {
+    pickup:  { lng:30.0430, lat:-1.9875, name:'Muhima Road',           emoji:'🧒' },
+    dropoff: { lng:30.0455, lat:-1.9862, name:'Nyamirambo Market',     emoji:'🛒' },
+    baseTip: 1600, desc:'Kid needs groceries from the market'
+  },
+  {
+    pickup:  { lng:30.0448, lat:-1.9833, name:'Nyamirambo Heights',    emoji:'👨‍💼' },
+    dropoff: { lng:30.0443, lat:-1.9896, name:'Biryogo Junction',      emoji:'🚌' },
+    baseTip: 2500, desc:'Business man catching a bus — big tip if fast'
+  },
+  {
+    pickup:  { lng:30.0472, lat:-1.9910, name:'Stadium Road',          emoji:'🎉' },
+    dropoff: { lng:30.0448, lat:-1.9833, name:'Nyamirambo Heights',    emoji:'🏠' },
+    baseTip: 3000, desc:'Final run — fan heading home after the game'
+  },
+];
+
+/* ════════════════════════════════════════════════
+   TRAFFIC
+════════════════════════════════════════════════ */
+const TRAFFIC_DEFS = [
+  { waypoints:[[30.0430,-1.9872],[30.0498,-1.9856],[30.0430,-1.9872]], speed:0.007, emoji:'🚗'  },
+  { waypoints:[[30.0455,-1.9835],[30.0452,-1.9908],[30.0455,-1.9835]], speed:0.005, emoji:'🚐'  },
+  { waypoints:[[30.0510,-1.9865],[30.0432,-1.9870],[30.0510,-1.9865]], speed:0.009, emoji:'🚕'  },
+  { waypoints:[[30.0440,-1.9858],[30.0488,-1.9895],[30.0440,-1.9858]], speed:0.006, emoji:'🚙'  },
+];
+
+/* ════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════ */
+let player        = { lng:CENTER[0], lat:CENTER[1] };
+let vel           = { x:0, y:0 };
+let totalTips     = 0;
+let missionIdx    = 0;        // 0-5
+let phase         = 'PICKUP'; // 'PICKUP' | 'DROPOFF'
+let carryStart    = 0;
+let currentTip    = 0;
+let gameRunning   = false;
+let crashCooldown = 0;
+let keys          = {};
+let playerMarker  = null;
+let activeMarker  = null;    // current pickup or dropoff marker
+let traffic       = [];      // { def, marker, idx, t, pos }
+let raf           = null;
+let toastTimer    = null;
+let carryInterval = null;
+
+/* ════════════════════════════════════════════════
+   MAP
+════════════════════════════════════════════════ */
+const map = new maplibregl.Map({
+  container:'map', style:'https://tiles.openfreemap.org/styles/liberty',
+  center:CENTER, zoom:ZOOM, pitch:PITCH, bearing:BEARING, antialias:true,
+});
+
+map.on('load', () => {
+  map.keyboard.disable();
+  try {
+    const layers  = map.getStyle().layers;
+    const bldLyr  = layers.find(l => l['source-layer'] === 'building');
+    const srcName = bldLyr ? bldLyr.source : 'openmaptiles';
+    const symLyr  = layers.find(l => l.type === 'symbol');
+    if (!map.getLayer('3d-buildings')) {
+      map.addLayer({
+        id:'3d-buildings', source:srcName, 'source-layer':'building',
+        type:'fill-extrusion', minzoom:14,
+        paint:{
+          'fill-extrusion-color':'#1A3D2B',
+          'fill-extrusion-height':['interpolate',['linear'],['zoom'],14,0,14.5,['coalesce',['get','height'],['get','render_height'],5]],
+          'fill-extrusion-base':['coalesce',['get','min_height'],['get','render_min_height'],0],
+          'fill-extrusion-opacity':0.88,
+        }
+      }, symLyr ? symLyr.id : undefined);
+    }
+  } catch(e) { console.warn('3D buildings skipped:',e.message); }
+});
+
+/* ════════════════════════════════════════════════
+   MARKERS
+════════════════════════════════════════════════ */
+function makeEl(cls, emoji) {
+  const el = document.createElement('div');
+  el.className = cls; el.innerHTML = emoji; return el;
+}
+
+function makeMarker(cls, emoji, lngLat) {
+  return new maplibregl.Marker({ element: makeEl(cls, emoji), anchor:'center' })
+    .setLngLat(lngLat).addTo(map);
+}
+
+function setActiveMarker(phase) {
+  if (activeMarker) { activeMarker.remove(); activeMarker = null; }
+  const m = MISSIONS[missionIdx];
+  if (phase === 'PICKUP') {
+    activeMarker = makeMarker('pickup-el', m.pickup.emoji, [m.pickup.lng, m.pickup.lat]);
+  } else {
+    activeMarker = makeMarker('dropoff-el', m.dropoff.emoji, [m.dropoff.lng, m.dropoff.lat]);
+  }
+}
+
+function spawnTraffic() {
+  TRAFFIC_DEFS.forEach((def, i) => {
+    const el = document.createElement('div');
+    el.className = 'traffic-el'; el.innerHTML = def.emoji;
+    const marker = new maplibregl.Marker({ element:el, anchor:'center' })
+      .setLngLat(def.waypoints[0]).addTo(map);
+    traffic.push({ def, marker, idx:0, t: i * 0.25, pos:[...def.waypoints[0]] });
+  });
+}
+
+/* ════════════════════════════════════════════════
+   TRAFFIC UPDATE
+════════════════════════════════════════════════ */
+function updateTraffic() {
+  traffic.forEach(car => {
+    car.t += car.def.speed;
+    if (car.t >= 1) {
+      car.t -= 1;
+      car.idx = (car.idx + 1) % (car.def.waypoints.length - 1);
+    }
+    const from = car.def.waypoints[car.idx];
+    const to   = car.def.waypoints[Math.min(car.idx + 1, car.def.waypoints.length - 1)];
+    car.pos = [
+      from[0] + (to[0] - from[0]) * car.t,
+      from[1] + (to[1] - from[1]) * car.t,
+    ];
+    car.marker.setLngLat(car.pos);
+  });
+}
+
+/* ════════════════════════════════════════════════
+   CRASH CHECK
+════════════════════════════════════════════════ */
+function checkCrash() {
+  if (crashCooldown > 0) { crashCooldown--; return; }
+  for (const car of traffic) {
+    const dlng = player.lng - car.pos[0];
+    const dlat = player.lat - car.pos[1];
+    if (Math.sqrt(dlng*dlng + dlat*dlat) < CRASH_RAD) {
+      handleCrash(); return;
+    }
+  }
+}
+
+function handleCrash() {
+  vel.x = 0; vel.y = 0;
+  crashCooldown = 150; // 2.5s immunity
+  const flash = document.getElementById('crash-flash');
+  flash.classList.add('on');
+  setTimeout(() => flash.classList.remove('on'), 300);
+
+  if (phase === 'DROPOFF') {
+    // Drop passenger — go back to pickup
+    phase = 'PICKUP';
+    clearInterval(carryInterval);
+    document.getElementById('carry-bar').style.display = 'none';
+    document.getElementById('player-emoji').textContent = '🛵';
+    document.querySelector('.player-el').classList.remove('carrying');
+    setActiveMarker('PICKUP');
+    updateMissionBar();
+    showToast('💥 Crashed! Passenger bailed — pick them up again', true);
+  } else {
+    showToast('💥 Watch out! Dodge the traffic!', true);
+  }
+}
+
+/* ════════════════════════════════════════════════
+   MISSION LOGIC
+════════════════════════════════════════════════ */
+function updateMissionBar() {
+  const m = MISSIONS[missionIdx];
+  const label = phase === 'PICKUP' ? '🛵 Ride to pickup' : '📍 Deliver to';
+  const loc   = phase === 'PICKUP' ? m.pickup.name : m.dropoff.name;
+  document.getElementById('mission-val').textContent  = (missionIdx + 1) + ' / 6';
+  document.querySelector('#mission-bar .m-label').textContent = label;
+  document.getElementById('mission-text').textContent = loc;
+}
+
+function checkPickup() {
+  const m = MISSIONS[missionIdx];
+  if (phase === 'PICKUP') {
+    const dlng = player.lng - m.pickup.lng;
+    const dlat = player.lat - m.pickup.lat;
+    if (Math.sqrt(dlng*dlng + dlat*dlat) < PICKUP_RAD) {
+      doPickup(m);
+    }
+  } else {
+    const dlng = player.lng - m.dropoff.lng;
+    const dlat = player.lat - m.dropoff.lat;
+    if (Math.sqrt(dlng*dlng + dlat*dlat) < PICKUP_RAD) {
+      doDropoff(m);
+    }
+  }
+}
+
+function doPickup(m) {
+  phase = 'DROPOFF';
+  carryStart = Date.now();
+  currentTip = m.baseTip;
+
+  // Switch marker to dropoff
+  setActiveMarker('DROPOFF');
+  updateMissionBar();
+
+  // Show carry bar
+  document.getElementById('carry-bar').style.display = 'block';
+  document.getElementById('carry-tip').textContent = currentTip.toLocaleString() + ' RWF';
+
+  // Update player emoji
+  document.getElementById('player-emoji').textContent = '🛵';
+  document.querySelector('.player-el').classList.add('carrying');
+
+  // Decay interval
+  clearInterval(carryInterval);
+  carryInterval = setInterval(() => {
+    if (phase !== 'DROPOFF') { clearInterval(carryInterval); return; }
+    currentTip = Math.max(200, currentTip - TIP_DECAY_SEC);
+    document.getElementById('carry-tip').textContent = currentTip.toLocaleString() + ' RWF';
+  }, 1000);
+
+  showToast(`${m.pickup.emoji} Picked up! Deliver to ${m.dropoff.name}`);
+}
+
+function doDropoff(m) {
+  clearInterval(carryInterval);
+  phase = 'PICKUP';
+  totalTips += currentTip;
+  document.getElementById('tips-val').textContent = totalTips.toLocaleString() + ' RWF';
+  document.getElementById('carry-bar').style.display = 'none';
+  document.querySelector('.player-el').classList.remove('carrying');
+
+  showToast(`+${currentTip.toLocaleString()} RWF  •  ${m.dropoff.name} ✓`);
+
+  missionIdx++;
+  if (missionIdx >= MISSIONS.length) {
+    setTimeout(showEnd, 1400);
+    return;
+  }
+  setActiveMarker('PICKUP');
+  updateMissionBar();
+}
+
+/* ════════════════════════════════════════════════
+   SPEED HUD
+════════════════════════════════════════════════ */
+function updateSpeedHud() {
+  const speed = Math.sqrt(vel.x*vel.x + vel.y*vel.y);
+  const pct   = Math.min(speed / MAX_VEL * 100, 100);
+  const kmh   = Math.round(speed * VEL_TO_KMH);
+  document.getElementById('speed-bar-fill').style.width = pct + '%';
+  document.getElementById('speed-val').textContent = kmh + ' km/h';
+  // Dynamic zoom: pull back slightly at high speed
+  const targetZoom = ZOOM - (pct / 100) * 0.8;
+  map.easeTo({ zoom: targetZoom, duration: 200 });
+}
+
+/* ════════════════════════════════════════════════
+   GAME LOOP
+════════════════════════════════════════════════ */
+function gameLoop() {
+  if (!gameRunning) return;
+
+  // Compute input
+  let ax = 0, ay = 0;
+  if (keys['ArrowUp']   ||keys['KeyW']) ay += ACCEL;
+  if (keys['ArrowDown'] ||keys['KeyS']) ay -= ACCEL;
+  if (keys['ArrowLeft'] ||keys['KeyA']) ax -= ACCEL * LNG_FACTOR;
+  if (keys['ArrowRight']||keys['KeyD']) ax += ACCEL * LNG_FACTOR;
+
+  const hasInput = ax !== 0 || ay !== 0;
+
+  // Apply acceleration + friction
+  vel.x = (vel.x + ax) * (hasInput ? FRICTION_ON : FRICTION_OFF);
+  vel.y = (vel.y + ay) * (hasInput ? FRICTION_ON : FRICTION_OFF);
+
+  // Clamp to max speed
+  const spd = Math.sqrt(vel.x*vel.x + vel.y*vel.y);
+  if (spd > MAX_VEL) { vel.x = vel.x/spd*MAX_VEL; vel.y = vel.y/spd*MAX_VEL; }
+
+  // Snap to zero at very low speed
+  if (Math.abs(vel.x) < 0.0000005) vel.x = 0;
+  if (Math.abs(vel.y) < 0.0000005) vel.y = 0;
+
+  player.lng += vel.x;
+  player.lat += vel.y;
+
+  playerMarker.setLngLat([player.lng, player.lat]);
+  map.easeTo({ center:[player.lng, player.lat], duration:CAM_DURATION });
+
+  updateTraffic();
+  checkCrash();
+  checkPickup();
+  updateSpeedHud();
+
+  raf = requestAnimationFrame(gameLoop);
+}
+
+/* ════════════════════════════════════════════════
+   WIN SCREEN
+════════════════════════════════════════════════ */
+function showEnd() {
+  gameRunning = false; cancelAnimationFrame(raf); clearInterval(carryInterval);
+  const pct = Math.round(totalTips / 12400 * 100);
+  const rank = pct >= 90 ? '🥇 Moto Legend' : pct >= 70 ? '🥈 Street Pro' : '🥉 Rookie Rider';
+  document.getElementById('end-screen').innerHTML = `
+    <div style="font-size:64px;animation:bob 1.6s ease-in-out infinite">🏆</div>
+    <div style="font-size:40px;font-weight:900;color:#D4A017;margin-top:10px">ALL MISSIONS DONE!</div>
+    <div style="font-size:18px;color:#C8E6D8;margin-top:4px">${rank}</div>
+    <div style="color:#D4A017;font-size:52px;font-weight:800;margin:16px 0;line-height:1">
+      ${totalTips.toLocaleString()}<span style="font-size:20px;font-weight:400;color:#98C8B0;margin-left:4px">RWF</span>
+    </div>
+    <div style="color:#3D5E4A;font-size:13px;margin-bottom:8px">out of 12,400 RWF max (${pct}% efficiency)</div>
+    <div style="background:rgba(46,125,94,0.15);border:1.5px solid #1E4D35;border-radius:14px;padding:16px 24px;max-width:300px;margin:16px 0 24px">
+      <div style="font-size:10px;color:#3D5E4A;text-transform:uppercase;letter-spacing:2px">Coming in Stage 3</div>
+      <div style="color:#C8E6D8;font-weight:700;font-size:15px;margin-top:8px">🚗 Cars Unlocked</div>
+      <div style="color:#3D5E4A;font-size:12px;margin-top:4px">Toyota · Hiace Taxi · Land Cruiser</div>
+      <div style="color:#3D5E4A;font-size:12px">Wider roads · Harder traffic · New districts</div>
+    </div>
+    <button class="ss-btn" onclick="location.reload()">🛵  Play Again</button>
+  `;
+  document.getElementById('end-screen').classList.add('active');
+}
+
+/* ════════════════════════════════════════════════
+   START
+════════════════════════════════════════════════ */
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+
+  // Player marker
+  const playerEl = makeEl('player-el', '🛵');
+  playerEl.querySelector ? null : null;
+  const inner = document.createElement('span');
+  inner.id = 'player-emoji'; inner.textContent = '🛵';
+  playerEl.innerHTML = ''; playerEl.appendChild(inner);
+
+  playerMarker = new maplibregl.Marker({ element:playerEl, anchor:'center' })
+    .setLngLat([player.lng, player.lat]).addTo(map);
+
+  // First mission marker
+  setActiveMarker('PICKUP');
+  updateMissionBar();
+
+  // Traffic
+  spawnTraffic();
+
+  gameRunning = true;
+  gameLoop();
+}
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+
+/* ════════════════════════════════════════════════
+   TOAST
+════════════════════════════════════════════════ */
+function showToast(msg, isCrash = false) {
+  const t = document.getElementById('toast');
+  clearTimeout(toastTimer);
+  t.textContent = msg;
+  t.className = isCrash ? 'crash show' : 'show';
+  toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+}
+
+/* ════════════════════════════════════════════════
+   KEYBOARD
+════════════════════════════════════════════════ */
+const NAV = new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ']);
+window.addEventListener('keydown', e => { keys[e.code]=true;  if(NAV.has(e.key)) e.preventDefault(); });
+window.addEventListener('keyup',   e => { keys[e.code]=false; });
+
+/* ════════════════════════════════════════════════
+   JOYSTICK
+════════════════════════════════════════════════ */
+(function(){
+  const zone=document.getElementById('joy-zone');
+  const thumb=document.getElementById('joy-thumb');
+  const MAX=36; let start=null;
+  function move(cx,cy){
+    if(!start)return;
+    let dx=cx-start.x, dy=cy-start.y;
+    const mag=Math.sqrt(dx*dx+dy*dy);
+    if(mag>MAX){dx=dx/mag*MAX;dy=dy/mag*MAX;}
+    thumb.style.transform=`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`;
+    keys['ArrowUp']=dy<-8; keys['ArrowDown']=dy>8;
+    keys['ArrowLeft']=dx<-8; keys['ArrowRight']=dx>8;
+  }
+  function end(){
+    start=null; thumb.style.transform='translate(-50%,-50%)';
+    keys['ArrowUp']=keys['ArrowDown']=keys['ArrowLeft']=keys['ArrowRight']=false;
+  }
+  zone.addEventListener('touchstart', e=>{e.preventDefault();start={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:false});
+  zone.addEventListener('touchmove',  e=>{e.preventDefault();move(e.touches[0].clientX,e.touches[0].clientY);},{passive:false});
+  zone.addEventListener('touchend',   e=>{e.preventDefault();end();},{passive:false});
+  zone.addEventListener('touchcancel',e=>{e.preventDefault();end();},{passive:false});
+})();
+</script>
+</body>
+</html>

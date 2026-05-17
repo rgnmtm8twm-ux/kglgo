@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>KGL GO</title>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <style>
+    /* ── Reset ─────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #081510; }
+
+    body { font-family: -apple-system, 'Segoe UI', Helvetica, sans-serif; }
+
+    /* ── Map ────────────────────────────────────────────── */
+    #map { width: 100%; height: 100%; }
+
+    /* Dark-mode the map canvas without affecting DOM markers */
+    .maplibregl-canvas {
+      filter: invert(0.95) brightness(0.42) contrast(1.08) saturate(0.75);
+    }
+
+    /* Hide default controls */
+    .maplibregl-ctrl-group,
+    .maplibregl-ctrl-logo { display: none !important; }
+    .maplibregl-ctrl-attrib {
+      background: rgba(8,21,16,0.7) !important;
+      color: #334d3e !important;
+      font-size: 9px !important;
+    }
+
+    /* ── HUD bar ─────────────────────────────────────────── */
+    #hud {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 14px 16px;
+      pointer-events: none;
+      z-index: 10;
+      gap: 8px;
+    }
+
+    .hud-pill {
+      background: rgba(8, 21, 16, 0.88);
+      border: 1.5px solid #2E7D5E;
+      border-radius: 50px;
+      padding: 8px 18px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      flex-shrink: 0;
+    }
+
+    .hud-pill .lbl {
+      font-size: 9px;
+      color: #5A9478;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+    }
+    .hud-pill .val {
+      font-size: 20px;
+      font-weight: 800;
+      color: #D4A017;
+      line-height: 1.2;
+    }
+
+    .hud-center {
+      background: rgba(8, 21, 16, 0.88);
+      border: 1.5px solid #D4A017;
+      border-radius: 50px;
+      padding: 8px 20px;
+      text-align: center;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      flex-shrink: 0;
+    }
+    .hud-center .t1 { font-size: 13px; font-weight: 900; color: #D4A017; letter-spacing: 3px; }
+    .hud-center .t2 { font-size: 9px; color: #5A9478; letter-spacing: 3px; }
+
+    /* ── District badge ──────────────────────────────────── */
+    #district-badge {
+      position: absolute;
+      bottom: 24px;
+      right: 16px;
+      background: rgba(8,21,16,0.85);
+      border: 1.5px solid #2E7D5E;
+      border-radius: 12px;
+      padding: 10px 16px;
+      pointer-events: none;
+      z-index: 10;
+      backdrop-filter: blur(8px);
+    }
+    #district-badge .d-label { font-size: 9px; color: #5A9478; text-transform: uppercase; letter-spacing: 1.5px; }
+    #district-badge .d-name  { font-size: 13px; font-weight: 700; color: #C8E6D8; margin-top: 2px; }
+    #district-badge .d-hint  { font-size: 10px; color: #3D5E4A; margin-top: 4px; }
+
+    /* ── Toast ───────────────────────────────────────────── */
+    #toast {
+      position: absolute;
+      bottom: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: #D4A017;
+      color: #081510;
+      padding: 11px 26px;
+      border-radius: 50px;
+      font-weight: 800;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 20;
+      max-width: 90vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Mobile joystick ─────────────────────────────────── */
+    #joy-zone {
+      position: absolute;
+      bottom: 30px;
+      left: 24px;
+      width: 110px;
+      height: 110px;
+      z-index: 15;
+      touch-action: none;
+    }
+    #joy-base {
+      width: 100%;
+      height: 100%;
+      background: rgba(8,21,16,0.65);
+      border: 2px solid #2E7D5E;
+      border-radius: 50%;
+      position: relative;
+    }
+    #joy-thumb {
+      width: 46px;
+      height: 46px;
+      background: radial-gradient(circle at 35% 35%, #2E7D5E, #1A5F47);
+      border: 2px solid #D4A017;
+      border-radius: 50%;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      transition: transform 0.06s;
+    }
+
+    /* ── Player marker ───────────────────────────────────── */
+    .player-el {
+      width: 38px; height: 38px;
+      background: radial-gradient(circle at 40% 35%, #2E7D5E, #1A5F47);
+      border: 3px solid #D4A017;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 0 6px rgba(212,160,23,0.18), 0 2px 8px rgba(0,0,0,0.5);
+    }
+
+    /* ── Passenger marker ────────────────────────────────── */
+    .pax-el {
+      width: 34px; height: 34px;
+      background: #D4A017;
+      border: 2.5px solid #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px;
+      cursor: pointer;
+      animation: pax-pulse 2.2s ease-out infinite;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    @keyframes pax-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(212,160,23,0.85), 0 2px 8px rgba(0,0,0,0.4); }
+      70%  { box-shadow: 0 0 0 14px rgba(212,160,23,0), 0 2px 8px rgba(0,0,0,0.4); }
+      100% { box-shadow: 0 0 0 0 rgba(212,160,23,0), 0 2px 8px rgba(0,0,0,0.4); }
+    }
+
+    /* ── Start screen ────────────────────────────────────── */
+    #start-screen {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 60%, #0d2a1a 0%, #060e0a 100%);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100; gap: 0;
+      padding: 24px;
+    }
+    .ss-icon {
+      font-size: 72px;
+      animation: bob 2.4s ease-in-out infinite;
+      margin-bottom: 12px;
+    }
+    @keyframes bob {
+      0%,100% { transform: translateY(0) scale(1); }
+      50%      { transform: translateY(-10px) scale(1.06); }
+    }
+    .ss-title {
+      font-size: 54px; font-weight: 900;
+      color: #D4A017; letter-spacing: -1px; line-height: 1;
+    }
+    .ss-sub {
+      font-size: 20px; font-weight: 300;
+      color: #C8E6D8; margin-top: 4px;
+      letter-spacing: 6px; text-transform: uppercase;
+    }
+    .ss-district {
+      margin-top: 18px;
+      background: rgba(46,125,94,0.18);
+      border: 1.5px solid #2E7D5E;
+      color: #98C8B0; padding: 7px 20px;
+      border-radius: 50px; font-size: 13px; font-weight: 600;
+    }
+    .ss-desc {
+      margin-top: 10px; color: #3D5E4A;
+      font-size: 13px; text-align: center;
+      max-width: 280px; line-height: 1.5;
+    }
+    .ss-stats {
+      margin-top: 20px;
+      display: flex; gap: 12px;
+    }
+    .ss-stat {
+      background: rgba(46,125,94,0.12);
+      border: 1px solid #1E4D35;
+      border-radius: 10px; padding: 10px 16px;
+      text-align: center;
+    }
+    .ss-stat .sv { font-size: 20px; font-weight: 800; color: #D4A017; }
+    .ss-stat .sk { font-size: 10px; color: #3D5E4A; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+    .ss-btn {
+      margin-top: 28px;
+      background: #D4A017; color: #081510;
+      border: none; padding: 17px 52px;
+      border-radius: 50px; font-size: 17px;
+      font-weight: 900; cursor: pointer;
+      letter-spacing: 2px; text-transform: uppercase;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 4px 24px rgba(212,160,23,0.35);
+    }
+    .ss-btn:hover  { background: #E8B820; transform: scale(1.03); }
+    .ss-btn:active { transform: scale(0.97); }
+    .ss-hint {
+      margin-top: 16px; color: #2A4035;
+      font-size: 12px; text-align: center; line-height: 1.6;
+    }
+
+    /* ── Full-screen overlay (win) ───────────────────────── */
+    .full-overlay {
+      display: none;
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 60%, #0d2a1a 0%, #060e0a 100%);
+      flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100; text-align: center;
+      padding: 24px;
+    }
+    .full-overlay.active { display: flex; }
+  </style>
+</head>
+<body>
+
+<!-- Map container -->
+<div id="map"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-pill">
+    <div class="lbl">Tips Earned</div>
+    <div class="val" id="tips-val">0 RWF</div>
+  </div>
+  <div class="hud-center">
+    <div class="t1">KGL</div>
+    <div class="t2">GO</div>
+  </div>
+  <div class="hud-pill" style="text-align:right">
+    <div class="lbl">Passengers</div>
+    <div class="val" id="pax-val">0 / 8</div>
+  </div>
+</div>
+
+<!-- District info -->
+<div id="district-badge">
+  <div class="d-label">📍 District</div>
+  <div class="d-name">Nyamirambo</div>
+  <div class="d-hint">↑↓←→ or WASD to walk</div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Mobile joystick -->
+<div id="joy-zone">
+  <div id="joy-base">
+    <div id="joy-thumb"></div>
+  </div>
+</div>
+
+<!-- Start screen -->
+<div id="start-screen">
+  <div class="ss-icon">🇷🇼</div>
+  <div class="ss-title">KGL GO</div>
+  <div class="ss-sub">Kigali Streets</div>
+  <div class="ss-district">📍 Nyamirambo District — Stage 1</div>
+  <div class="ss-desc">Walk the real streets of Nyamirambo. Find passengers. Earn tips. Built on real OSM map data.</div>
+  <div class="ss-stats">
+    <div class="ss-stat"><div class="sv">8</div><div class="sk">Passengers</div></div>
+    <div class="ss-stat"><div class="sv">6,200</div><div class="sk">Max RWF</div></div>
+    <div class="ss-stat"><div class="sv">Real</div><div class="sk">Streets</div></div>
+  </div>
+  <button class="ss-btn" id="start-btn">▶  Start Walking</button>
+  <div class="ss-hint">
+    Keyboard: Arrow keys or W A S D<br>
+    Mobile: Use the on-screen joystick
+  </div>
+</div>
+
+<!-- Win screen -->
+<div class="full-overlay" id="win-screen"></div>
+
+<script>
+'use strict';
+
+/* ════════════════════════════════════════════════════
+   CONFIG
+════════════════════════════════════════════════════ */
+const CENTER       = [30.0462, -1.9882];   // [lng, lat] Nyamirambo
+const ZOOM         = 17.3;
+const PITCH        = 52;
+const BEARING      = -18;
+const MOVE_SPEED   = 0.000058;             // degrees per frame (~6 m at Kigali lat)
+const LNG_FACTOR   = 0.78;                // correct for latitude compression
+const PICKUP_RAD   = 0.00026;             // ~28 m pickup radius
+const CAM_DURATION = 80;                  // ms for camera ease
+
+/* ════════════════════════════════════════════════════
+   PASSENGER DATA  (real Nyamirambo street positions)
+════════════════════════════════════════════════════ */
+const PASSENGERS = [
+  { lng:30.0455, lat:-1.9862, name:'Nyamirambo Market',    tip:500,  emoji:'👴' },
+  { lng:30.0481, lat:-1.9847, name:'Mosque Corner',         tip:800,  emoji:'👩' },
+  { lng:30.0494, lat:-1.9874, name:'Avenue de la Paix',     tip:650,  emoji:'👦' },
+  { lng:30.0443, lat:-1.9896, name:'Biryogo Junction',      tip:1200, emoji:'👩‍💼' },
+  { lng:30.0508, lat:-1.9856, name:'KBC Hill',              tip:750,  emoji:'👨' },
+  { lng:30.0430, lat:-1.9875, name:'Muhima Road',           tip:900,  emoji:'👵' },
+  { lng:30.0472, lat:-1.9910, name:'Stadium Road',          tip:1100, emoji:'🧒' },
+  { lng:30.0448, lat:-1.9833, name:'Nyamirambo Heights',    tip:1500, emoji:'👨‍⚕️' },
+];
+
+/* ════════════════════════════════════════════════════
+   GAME STATE
+════════════════════════════════════════════════════ */
+let player       = { lng: CENTER[0], lat: CENTER[1] };
+let totalTips    = 0;
+let collected    = 0;
+let gameRunning  = false;
+let keys         = {};
+let playerMarker = null;
+let paxState     = [];   // { collected, marker }
+let raf          = null;
+let toastTimer   = null;
+
+/* ════════════════════════════════════════════════════
+   MAP
+════════════════════════════════════════════════════ */
+const map = new maplibregl.Map({
+  container : 'map',
+  style     : 'https://tiles.openfreemap.org/styles/liberty',
+  center    : CENTER,
+  zoom      : ZOOM,
+  pitch     : PITCH,
+  bearing   : BEARING,
+  antialias : true,
+});
+
+map.on('load', () => {
+  map.keyboard.disable();
+
+  /* Add 3-D building extrusion */
+  try {
+    const layers  = map.getStyle().layers;
+    const bldLyr  = layers.find(l => l['source-layer'] === 'building');
+    const srcName = bldLyr ? bldLyr.source : 'openmaptiles';
+    const symLyr  = layers.find(l => l.type === 'symbol');
+
+    if (!map.getLayer('3d-buildings')) {
+      map.addLayer({
+        id             : '3d-buildings',
+        source         : srcName,
+        'source-layer' : 'building',
+        type           : 'fill-extrusion',
+        minzoom        : 14,
+        paint: {
+          'fill-extrusion-color'   : '#1A3D2B',
+          'fill-extrusion-height'  : [
+            'interpolate', ['linear'], ['zoom'],
+            14, 0,
+            14.5, ['coalesce', ['get','height'], ['get','render_height'], 5]
+          ],
+          'fill-extrusion-base'    : ['coalesce', ['get','min_height'], ['get','render_min_height'], 0],
+          'fill-extrusion-opacity' : 0.88,
+        }
+      }, symLyr ? symLyr.id : undefined);
+    }
+  } catch (e) {
+    console.warn('3D buildings skipped:', e.message);
+  }
+});
+
+/* ════════════════════════════════════════════════════
+   MARKERS
+════════════════════════════════════════════════════ */
+function makePlayerMarker() {
+  const el = document.createElement('div');
+  el.className = 'player-el';
+  el.innerHTML = '🚶';
+  return new maplibregl.Marker({ element: el, anchor: 'center' })
+    .setLngLat([player.lng, player.lat])
+    .addTo(map);
+}
+
+function makePassengerMarker(pax) {
+  const el = document.createElement('div');
+  el.className = 'pax-el';
+  el.innerHTML = pax.emoji;
+  el.setAttribute('title', pax.name);
+  return new maplibregl.Marker({ element: el, anchor: 'center' })
+    .setLngLat([pax.lng, pax.lat])
+    .addTo(map);
+}
+
+/* ════════════════════════════════════════════════════
+   GAME LOOP
+════════════════════════════════════════════════════ */
+function gameLoop() {
+  if (!gameRunning) return;
+
+  let dx = 0, dy = 0;
+  if (keys['ArrowUp']    || keys['KeyW']) dy += MOVE_SPEED;
+  if (keys['ArrowDown']  || keys['KeyS']) dy -= MOVE_SPEED;
+  if (keys['ArrowLeft']  || keys['KeyA']) dx -= MOVE_SPEED * LNG_FACTOR;
+  if (keys['ArrowRight'] || keys['KeyD']) dx += MOVE_SPEED * LNG_FACTOR;
+
+  if (dx !== 0 || dy !== 0) {
+    player.lng += dx;
+    player.lat += dy;
+    playerMarker.setLngLat([player.lng, player.lat]);
+    map.easeTo({ center: [player.lng, player.lat], duration: CAM_DURATION });
+    checkPickups();
+  }
+
+  raf = requestAnimationFrame(gameLoop);
+}
+
+/* ════════════════════════════════════════════════════
+   PICKUPS
+════════════════════════════════════════════════════ */
+function checkPickups() {
+  PASSENGERS.forEach((pax, i) => {
+    if (paxState[i].collected) return;
+    const dlng = player.lng - pax.lng;
+    const dlat = player.lat - pax.lat;
+    if (Math.sqrt(dlng * dlng + dlat * dlat) < PICKUP_RAD) collect(i);
+  });
+}
+
+function collect(i) {
+  paxState[i].collected = true;
+  paxState[i].marker.remove();
+  totalTips += PASSENGERS[i].tip;
+  collected++;
+
+  document.getElementById('tips-val').textContent = totalTips.toLocaleString() + ' RWF';
+  document.getElementById('pax-val').textContent  = collected + ' / 8';
+
+  showToast(`+${PASSENGERS[i].tip.toLocaleString()} RWF  •  ${PASSENGERS[i].name} ✓`);
+
+  if (collected >= PASSENGERS.length) setTimeout(showWin, 1300);
+}
+
+/* ════════════════════════════════════════════════════
+   UI
+════════════════════════════════════════════════════ */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  clearTimeout(toastTimer);
+  t.textContent = msg;
+  t.classList.add('show');
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function showWin() {
+  gameRunning = false;
+  cancelAnimationFrame(raf);
+
+  const ws = document.getElementById('win-screen');
+  ws.innerHTML = `
+    <div style="font-size:72px;animation:bob 1.6s ease-in-out infinite">🏆</div>
+    <div style="font-size:46px;font-weight:900;color:#D4A017;margin-top:12px">BOSS LEVEL!</div>
+    <div style="color:#C8E6D8;font-size:16px;margin-top:6px">All 8 passengers found — Nyamirambo cleared</div>
+    <div style="color:#D4A017;font-size:52px;font-weight:800;margin:18px 0;line-height:1">${totalTips.toLocaleString()}<span style="font-size:22px;font-weight:400;color:#98C8B0;margin-left:4px">RWF</span></div>
+    <div style="background:rgba(46,125,94,0.15);border:1.5px solid #1E4D35;border-radius:14px;padding:18px 28px;max-width:300px;margin-bottom:28px">
+      <div style="font-size:10px;color:#3D5E4A;text-transform:uppercase;letter-spacing:2px">Unlocked in Stage 2</div>
+      <div style="color:#C8E6D8;font-weight:700;font-size:16px;margin-top:8px">🛵  Your First Moto</div>
+      <div style="color:#3D5E4A;font-size:12px;margin-top:4px">More speed · More passengers · More RWF</div>
+      <div style="color:#3D5E4A;font-size:12px;margin-top:2px">Then cars → Toyota · Hiace · Land Cruiser</div>
+    </div>
+    <button class="ss-btn" onclick="location.reload()">▶  Play Again</button>
+  `;
+  ws.classList.add('active');
+}
+
+/* ════════════════════════════════════════════════════
+   START
+════════════════════════════════════════════════════ */
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+
+  playerMarker = makePlayerMarker();
+
+  PASSENGERS.forEach((pax, i) => {
+    paxState.push({ collected: false, marker: makePassengerMarker(pax) });
+  });
+
+  gameRunning = true;
+  gameLoop();
+}
+
+document.getElementById('start-btn').addEventListener('click', startGame);
+
+/* ════════════════════════════════════════════════════
+   KEYBOARD
+════════════════════════════════════════════════════ */
+const NAV_KEYS = new Set(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ']);
+
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (NAV_KEYS.has(e.key)) e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+/* ════════════════════════════════════════════════════
+   MOBILE JOYSTICK
+════════════════════════════════════════════════════ */
+(function () {
+  const zone  = document.getElementById('joy-zone');
+  const thumb = document.getElementById('joy-thumb');
+  const MAX   = 36; // px max displacement
+  let start   = null;
+
+  function onMove(cx, cy) {
+    if (!start) return;
+    let dx = cx - start.x;
+    let dy = cy - start.y;
+    const mag = Math.sqrt(dx*dx + dy*dy);
+    if (mag > MAX) { dx = dx/mag*MAX; dy = dy/mag*MAX; }
+
+    thumb.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+    keys['ArrowUp']    = dy < -8;
+    keys['ArrowDown']  = dy >  8;
+    keys['ArrowLeft']  = dx < -8;
+    keys['ArrowRight'] = dx >  8;
+  }
+
+  function onEnd() {
+    start = null;
+    thumb.style.transform = 'translate(-50%, -50%)';
+    keys['ArrowUp'] = keys['ArrowDown'] = keys['ArrowLeft'] = keys['ArrowRight'] = false;
+  }
+
+  zone.addEventListener('touchstart', e => {
+    e.preventDefault();
+    start = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, { passive: false });
+
+  zone.addEventListener('touchmove', e => {
+    e.preventDefault();
+    onMove(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: false });
+
+  zone.addEventListener('touchend',   e => { e.preventDefault(); onEnd(); }, { passive: false });
+  zone.addEventListener('touchcancel',e => { e.preventDefault(); onEnd(); }, { passive: false });
+})();
+</script>
+</body>
+</html>
