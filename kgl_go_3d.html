@@ -2,942 +2,924 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>KGL GO — Street Level</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>KGL GO</title>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:#000; overflow:hidden; font-family:'Arial Black','Arial',sans-serif; }
-canvas { display:block; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#000;font-family:'Arial Black','Arial',sans-serif}
+canvas{display:block}
 
-/* ── HUD ───────────────────────────────── */
-#hud {
-  position:fixed; inset:0; pointer-events:none; z-index:10;
+/* ─── START ─────────────────────────────────── */
+#start{
+  position:fixed;inset:0;z-index:200;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.88);color:#fff;
 }
-
-/* Speedometer */
-#speedo {
-  position:absolute; bottom:28px; right:28px;
-  width:110px; height:110px;
-  background:rgba(0,0,0,0.72);
-  border:2px solid #00ff88;
-  border-radius:50%;
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  box-shadow:0 0 18px rgba(0,255,136,0.3);
+#start h1{font-size:80px;font-weight:900;letter-spacing:-4px;line-height:1}
+#start h1 span{color:#FFB830}
+#start .tag{font-size:13px;letter-spacing:4px;opacity:.45;margin:10px 0 18px}
+#start .desc{font-size:13px;opacity:.6;max-width:280px;text-align:center;line-height:1.7;margin-bottom:36px}
+#start button{
+  background:#FFB830;color:#0A0A0A;border:none;
+  padding:16px 56px;font-size:17px;font-weight:900;
+  border-radius:10px;cursor:pointer;letter-spacing:2px;
+  pointer-events:all;
 }
-#speed-num  { font-size:32px; font-weight:900; color:#00ff88; line-height:1; }
-#speed-unit { font-size:11px; color:rgba(0,255,136,0.6); letter-spacing:2px; margin-top:2px; }
+#start button:hover{background:#FFA500;transform:scale(1.03)}
 
-/* Mission panel */
-#mission-panel {
-  position:absolute; top:18px; left:50%; transform:translateX(-50%);
-  background:rgba(0,0,0,0.78);
-  border:1px solid rgba(255,255,255,0.18);
-  border-radius:14px; padding:10px 22px;
-  text-align:center; min-width:280px; color:#fff;
+/* ─── HUD ────────────────────────────────────── */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10;display:none}
+
+/* Speedo ring */
+#speedo{
+  position:absolute;bottom:28px;right:28px;
+  width:114px;height:114px;border-radius:50%;
+  background:rgba(5,5,15,.82);
+  border:2px solid rgba(255,184,48,.6);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:0 0 24px rgba(255,184,48,.25),inset 0 0 20px rgba(255,184,48,.05);
 }
-#mission-label { font-size:10px; opacity:0.55; letter-spacing:2px; text-transform:uppercase; }
-#mission-text  { font-size:14px; margin-top:4px; }
-#tip-val       { font-size:22px; font-weight:900; color:#FFD700; margin-top:3px; }
+#spd{font-size:34px;font-weight:900;color:#FFB830;line-height:1}
+#spu{font-size:10px;color:rgba(255,184,48,.55);letter-spacing:3px;margin-top:3px}
 
-/* Camera toggle btn */
-#cam-btn {
-  position:absolute; top:18px; right:18px;
-  background:rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.25);
-  color:#fff; padding:8px 14px; border-radius:8px;
-  font-size:12px; cursor:pointer; pointer-events:all;
-  letter-spacing:1px;
+/* Mission */
+#mpanel{
+  position:absolute;top:18px;left:50%;transform:translateX(-50%);
+  background:rgba(5,5,15,.82);border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;padding:10px 24px;text-align:center;min-width:290px;color:#fff;
 }
-#cam-btn:hover { background:rgba(255,255,255,0.12); }
+#mlabel{font-size:9px;letter-spacing:3px;opacity:.4;text-transform:uppercase}
+#mtext{font-size:14px;margin-top:5px}
+#mtip{font-size:22px;font-weight:900;color:#FFB830;margin-top:3px}
 
-/* Controls hint */
-#hint {
-  position:absolute; bottom:28px; left:28px;
-  color:rgba(255,255,255,0.4); font-size:11px; line-height:1.7;
+/* Progress dots */
+#dots{position:absolute;top:18px;left:18px;display:flex;gap:7px;align-items:center}
+.dot{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25)}
+.dot.done{background:#00E5A0;border-color:#00E5A0}
+.dot.now{background:#FFB830;border-color:#FFB830;box-shadow:0 0 8px #FFB830}
+
+/* Camera btn */
+#cambtn{
+  position:absolute;top:18px;right:18px;pointer-events:all;
+  background:rgba(5,5,15,.82);border:1px solid rgba(255,255,255,.18);
+  color:#fff;padding:8px 14px;border-radius:8px;font-size:11px;
+  cursor:pointer;letter-spacing:1px;
+}
+#cambtn:hover{background:rgba(255,255,255,.1)}
+
+/* Hint */
+#hint{
+  position:absolute;bottom:28px;left:28px;
+  color:rgba(255,255,255,.35);font-size:11px;line-height:1.9;
 }
 
 /* Crash flash */
-#crash-flash {
-  position:absolute; inset:0;
-  background:rgba(255,30,30,0.38);
-  opacity:0; pointer-events:none;
-}
+#flash{position:absolute;inset:0;background:rgba(255,30,30,.42);opacity:0;pointer-events:none;transition:opacity .08s}
 
-/* Mission progress dots */
-#progress {
-  position:absolute; top:18px; left:18px;
-  display:flex; gap:6px; align-items:center;
-}
-.dot {
-  width:10px; height:10px; border-radius:50%;
-  background:rgba(255,255,255,0.2);
-  border:1px solid rgba(255,255,255,0.3);
-}
-.dot.done { background:#00ff88; border-color:#00ff88; }
-.dot.active { background:#FFD700; border-color:#FFD700; box-shadow:0 0 6px #FFD700; }
+/* Speed-lines canvas (FP mode) */
+#lines{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
 
-/* ── START SCREEN ──────────────────────── */
-#start-screen {
-  position:fixed; inset:0; background:rgba(0,0,0,0.92);
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  z-index:100; color:#fff;
-}
-#start-screen h1 {
-  font-size:72px; font-weight:900; letter-spacing:-3px;
-  margin-bottom:6px;
-}
-.green { color:#00ff88; }
-#start-screen .sub  { opacity:0.5; font-size:14px; margin-bottom:10px; }
-#start-screen .desc { opacity:0.7; font-size:13px; max-width:300px; text-align:center; margin-bottom:36px; line-height:1.6; }
-#start-btn {
-  background:#00ff88; color:#000; border:none;
-  padding:16px 52px; font-size:18px; font-weight:900;
-  border-radius:10px; cursor:pointer; pointer-events:all;
-  letter-spacing:1px;
-}
-#start-btn:hover { background:#00ee77; transform:scale(1.03); }
-
-/* ── Mobile joystick ────────────────────── */
-#joy-wrap {
-  position:absolute; bottom:22px; left:22px;
-  width:130px; height:130px;
-  display:none; pointer-events:all;
-}
-#joy-base {
-  width:130px; height:130px;
-  background:rgba(255,255,255,0.08);
-  border:2px solid rgba(255,255,255,0.2);
-  border-radius:50%; position:relative;
-}
-#joy-knob {
-  width:56px; height:56px;
-  background:rgba(0,255,136,0.65);
-  border:2px solid rgba(0,255,136,0.9);
-  border-radius:50%; position:absolute;
-  top:37px; left:37px; pointer-events:none;
-}
-@media(max-width:768px) {
-  #joy-wrap { display:block; }
-  #hint { display:none; }
-  #speedo { bottom:170px; }
-}
+/* Joystick */
+#joy{position:absolute;bottom:22px;left:22px;width:130px;height:130px;display:none;pointer-events:all}
+#jbase{width:130px;height:130px;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.18);border-radius:50%;position:relative}
+#jknob{width:54px;height:54px;background:rgba(255,184,48,.7);border:2px solid rgba(255,184,48,.9);border-radius:50%;position:absolute;top:38px;left:38px;pointer-events:none}
+@media(max-width:768px){#joy{display:block}#hint{display:none}#speedo{bottom:170px}}
 </style>
 </head>
 <body>
 
-<!-- START SCREEN -->
-<div id="start-screen">
-  <h1>KGL <span class="green">GO</span></h1>
-  <div class="sub">🏍️  NYAMIRAMBO · KIGALI · RWANDA</div>
-  <div class="desc">Pick up passengers, dodge traffic,<br>keep the tip high. Real streets. Real speed.</div>
-  <button id="start-btn" onclick="startGame()">RIDE NOW</button>
+<div id="start">
+  <h1>KGL <span>GO</span></h1>
+  <div class="tag">NYAMIRAMBO · KIGALI</div>
+  <div class="desc">Ride the streets. Pick up passengers.<br>Beat the clock. Own the city.</div>
+  <button onclick="startGame()">TAP TO RIDE</button>
 </div>
 
-<!-- HUD (hidden until game starts) -->
-<div id="hud" style="display:none">
-  <!-- Progress dots -->
-  <div id="progress"></div>
-
-  <!-- Mission -->
-  <div id="mission-panel">
-    <div id="mission-label">MISSION</div>
-    <div id="mission-text">Loading...</div>
-    <div id="tip-val">0 RWF</div>
+<div id="hud">
+  <div id="dots"></div>
+  <div id="mpanel">
+    <div id="mlabel">MISSION</div>
+    <div id="mtext">—</div>
+    <div id="mtip">0 RWF</div>
   </div>
-
-  <!-- Camera toggle -->
-  <button id="cam-btn" onclick="toggleCam()">👁 1ST PERSON</button>
-
-  <!-- Speedometer -->
-  <div id="speedo">
-    <div id="speed-num">0</div>
-    <div id="speed-unit">KM/H</div>
-  </div>
-
-  <!-- Crash flash -->
-  <div id="crash-flash"></div>
-
-  <!-- Controls hint -->
-  <div id="hint">
-    W / ↑ &nbsp; Accelerate<br>
-    S / ↓ &nbsp; Brake<br>
-    A D / ← → &nbsp; Steer<br>
-    Space &nbsp; Handbrake<br>
-    V &nbsp; Toggle camera
-  </div>
-
-  <!-- Joystick -->
-  <div id="joy-wrap">
-    <div id="joy-base"><div id="joy-knob"></div></div>
-  </div>
+  <button id="cambtn" onclick="toggleCam()">👁 FIRST PERSON</button>
+  <div id="speedo"><div id="spd">0</div><div id="spu">KM/H</div></div>
+  <div id="flash"></div>
+  <canvas id="lines"></canvas>
+  <div id="hint">W / ↑ &nbsp;Accelerate<br>S / ↓ &nbsp;Brake<br>A D / ← → &nbsp;Steer<br>Space &nbsp;Handbrake<br>V &nbsp;Camera</div>
+  <div id="joy"><div id="jbase"><div id="jknob"></div></div></div>
 </div>
 
+<!-- Three.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Post-processing (bloom) -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
 <script>
 'use strict';
 
-// ═══════════════════════════════════════════════════════════
-//  CONSTANTS
-// ═══════════════════════════════════════════════════════════
-const ACCEL      = 0.018;
-const MAX_SPEED  = 0.70;
-const FRICTION   = 0.91;    // per-frame, frame-rate-compensated
-const TURN_SPD   = 0.034;
-const CAM_LAG    = 0.08;
-const CAM3_DIST  = 10;
-const CAM3_H     = 4.2;
-const PICKUP_RAD = 5.5;
-const CRASH_RAD  = 3.8;
+// ═══════════════════════════════════════════════════════════════
+//  COLOUR DESIGN  —  Kigali golden-hour palette
+// ═══════════════════════════════════════════════════════════════
+const C = {
+  // sky
+  sky_top : new THREE.Color(0x0B1240),
+  sky_mid : new THREE.Color(0x6B2D8C),
+  sky_hor : new THREE.Color(0xE84A10),
+  sky_haze: new THREE.Color(0xFFAA40),
+  sun     : new THREE.Color(0xFFE566),
 
-// Kigali building colours (warm African palette)
-const PALETTE = [
-  0xF2E3C6, 0xE4C99A, 0xD4956A, 0xB5C4B1,
-  0x8FA3BF, 0xC9A96E, 0xE8DDD2, 0xCFB997,
-  0xA67C52, 0xD8CBC0, 0xF0D9B5, 0xBBC8A8,
-];
+  // ground / road
+  ground  : 0xA8491E,
+  road    : 0x141412,
+  sidewalk: 0x706860,
+  mark    : 0xF0EBD5,
 
-// ═══════════════════════════════════════════════════════════
-//  THREE.JS INIT
-// ═══════════════════════════════════════════════════════════
-const scene    = new THREE.Scene();
-scene.background = new THREE.Color(0x6EA8D8);
-scene.fog        = new THREE.FogExp2(0x90BFE0, 0.007);
+  // buildings  —  flat-shaded, only 7 tones
+  bldg: [ 0xD46040, 0xEEDDB0, 0x6A8FAD, 0x8DAA88, 0xC9A468, 0xF2EDE4, 0xBB5540 ],
 
-const W = window.innerWidth, H = window.innerHeight;
-const camera = new THREE.PerspectiveCamera(72, W/H, 0.1, 500);
-camera.position.set(0, 8, -14);
+  // vehicles (traffic)
+  cars: [ 0x2255AA, 0xEEEEDD, 0xFF8800, 0x228833, 0xCC3333, 0x7744BB, 0x44AACC, 0xDDAA22 ],
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(W, H);
+  // moto
+  paint : 0xCC1111,
+  chrome: 0xCCCCCC,
+  dark  : 0x111111,
+  orange: 0xEE6600,
+  yellow: 0xFFCC00,
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+function rnd(a,b){ return a + Math.random()*(b-a); }
+function rndI(a,b){ return Math.floor(rnd(a,b+1)); }
+
+function flatMat(hex){
+  return new THREE.MeshToonMaterial({ color:hex, flatShading:true });
+}
+function stdMat(hex, roughness=0.55, metalness=0.1){
+  return new THREE.MeshStandardMaterial({ color:hex, roughness, metalness, flatShading:true });
+}
+
+function box(w,h,d){ return new THREE.BoxGeometry(w,h,d); }
+function cyl(rt,rb,h,s=12){ return new THREE.CylinderGeometry(rt,rb,h,s); }
+function cone(r,h,s=8){ return new THREE.ConeGeometry(r,h,s); }
+function tor(r,t,s=8,ss=32){ return new THREE.TorusGeometry(r,t,s,ss); }
+
+function mesh(geo, mat, cast=true, recv=true){
+  const m = new THREE.Mesh(geo,mat);
+  m.castShadow=cast; m.receiveShadow=recv; return m;
+}
+
+function add(parent, geo, mat, x,y,z, rx=0,ry=0,rz=0, cast=true, recv=true){
+  const m = mesh(geo,mat,cast,recv);
+  m.position.set(x,y,z); m.rotation.set(rx,ry,rz);
+  parent.add(m); return m;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCENE + RENDERER
+// ═══════════════════════════════════════════════════════════════
+const scene = new THREE.Scene();
+scene.fog   = new THREE.FogExp2(0xC86420, 0.0055); // warm sunset haze
+
+const camera = new THREE.PerspectiveCamera(78, innerWidth/innerHeight, 0.1, 500);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
 renderer.outputEncoding    = THREE.sRGBEncoding;
 renderer.toneMapping       = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.1;
 document.body.appendChild(renderer.domElement);
 
-// ── Lights ──────────────────────────────────────────────────
-const sun = new THREE.DirectionalLight(0xFFF0D0, 2.0);
-sun.position.set(60, 120, 50);
+// ─── Post-processing (bloom) ──────────────────────────────────
+let composer = null;
+try {
+  composer = new THREE.EffectComposer(renderer);
+  composer.addPass(new THREE.RenderPass(scene, camera));
+  const bloom = new THREE.UnrealBloomPass(
+    new THREE.Vector2(innerWidth, innerHeight),
+    0.55,   // strength
+    0.55,   // radius
+    0.82    // threshold
+  );
+  composer.addPass(bloom);
+} catch(e){ composer = null; }  // fallback: render without bloom
+
+// ─── Lights ───────────────────────────────────────────────────
+// Sun — warm golden, low angle (golden hour)
+const sun = new THREE.DirectionalLight(0xFFD070, 2.2);
+sun.position.set(-80, 60, 30);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.set(2048,2048);
 const sc = sun.shadow.camera;
-Object.assign(sc, { near:0.5, far:400, left:-180, right:180, top:180, bottom:-180 });
-sun.shadow.bias = -0.0008;
+Object.assign(sc,{near:.5,far:350,left:-160,right:160,top:160,bottom:-160});
+sun.shadow.bias = -0.0006;
 scene.add(sun);
-scene.add(new THREE.AmbientLight(0xFFEECC, 0.55));
-scene.add(new THREE.HemisphereLight(0x87CEEB, 0xC1440E, 0.45));
 
-// ═══════════════════════════════════════════════════════════
-//  WORLD  — Ground, Roads, Buildings, Props
-// ═══════════════════════════════════════════════════════════
+// Rim light — cool blue from opposite side (gives pop to silhouettes)
+const rim = new THREE.DirectionalLight(0x4488FF, 0.6);
+rim.position.set(80, 40, -30);
+scene.add(rim);
 
-// ── Ground (laterite red soil) ───────────────────────────
-const groundMesh = new THREE.Mesh(
-  new THREE.PlaneGeometry(700, 700),
-  new THREE.MeshLambertMaterial({ color: 0xB84C1A })
+// Sky fill
+scene.add(new THREE.HemisphereLight(0xFFAA44, 0xC1440E, 0.5));
+scene.add(new THREE.AmbientLight(0xFF9944, 0.25));
+
+// ═══════════════════════════════════════════════════════════════
+//  SKY  —  gradient sphere + sun disc
+// ═══════════════════════════════════════════════════════════════
+const SKY_VERT = `
+  varying vec3 vPos;
+  void main(){ vPos=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }
+`;
+const SKY_FRAG = `
+  varying vec3 vPos;
+  uniform vec3 cTop,cMid,cHor,cHaze,cSun;
+  uniform vec3 sunDir;
+  void main(){
+    vec3 n = normalize(vPos);
+    float t = clamp(n.y, -0.08, 1.0);
+
+    // 4-stop sky gradient
+    vec3 sky;
+    if(t>0.35)       sky = mix(cMid, cTop,  (t-0.35)/0.65);
+    else if(t>0.05)  sky = mix(cHor, cMid,  (t-0.05)/0.30);
+    else if(t>-0.04) sky = mix(cHaze, cHor, (t+0.04)/0.09);
+    else             sky = cHaze;
+
+    // Sun disc + glow
+    float d = dot(n, normalize(sunDir));
+    sky += cSun.rgb * smoothstep(0.997,1.0,d) * 3.0;
+    sky += vec3(1.,.7,.3) * smoothstep(0.96,0.999,d) * 0.5 * max(0.,1.-t);
+
+    gl_FragColor = vec4(sky,1.);
+  }
+`;
+
+const skyMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(420, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: {
+      cTop: {value:C.sky_top},  cMid:{value:C.sky_mid},
+      cHor: {value:C.sky_hor},  cHaze:{value:C.sky_haze},
+      cSun: {value:C.sun},
+      sunDir:{value: sun.position.clone().normalize()},
+    },
+    vertexShader: SKY_VERT, fragmentShader: SKY_FRAG,
+  })
 );
-groundMesh.rotation.x = -Math.PI/2;
-groundMesh.receiveShadow = true;
-scene.add(groundMesh);
+scene.add(skyMesh);
 
-// ── Road materials ───────────────────────────────────────
-const matRoad     = new THREE.MeshLambertMaterial({ color: 0x252520 });
-const matSidewalk = new THREE.MeshLambertMaterial({ color: 0x857F72 });
-const matMark     = new THREE.MeshLambertMaterial({ color: 0xF0EDD0 });
+// Stylized cloud layers (flat discs at altitude)
+const cloudMat = flatMat(0xFFEEDD);
+cloudMat.transparent = true; cloudMat.opacity = 0.18;
+[[120,90,-60],[−60,85,110],[40,95,80],[−120,88,−80]].forEach(([x,y,z])=>{
+  const c = mesh(new THREE.CylinderGeometry(rnd(18,35),rnd(18,35),.8,8), cloudMat, false,false);
+  c.position.set(x,y,z); c.rotation.x=.1*Math.random();
+  scene.add(c);
+});
 
-// Build a straight road segment (along local X axis by default, rotateY for N-S)
-function makeRoad(cx, cz, length, width, rotY = 0) {
+// ═══════════════════════════════════════════════════════════════
+//  WORLD  —  Ground, Roads, Buildings
+// ═══════════════════════════════════════════════════════════════
+
+// ─── Ground ────────────────────────────────────────────────────
+const gMat = flatMat(C.ground);
+const gnd  = mesh(new THREE.PlaneGeometry(700,700), gMat, false, true);
+gnd.rotation.x = -Math.PI/2;
+scene.add(gnd);
+
+// ─── Road builder ──────────────────────────────────────────────
+const rMat  = flatMat(C.road);
+const swMat = flatMat(C.sidewalk);
+const mMat  = flatMat(C.mark);
+mMat.emissive = new THREE.Color(0xE0D8B0);
+mMat.emissiveIntensity = 0.15;
+
+function makeRoad(cx,cz,len,w,rotY=0){
   const g = new THREE.Group();
-
-  // Asphalt
-  addBox(g, length, 0.07, width, 0, 0.035, 0, matRoad, false, true);
-
+  // Asphalt slab
+  const r = mesh(box(len,.09,w), rMat, false, true);
+  r.position.y=.045; g.add(r);
   // Sidewalks
-  const swW = 1.6;
-  addBox(g, length, 0.12, swW, 0, 0.06, -(width/2 + swW/2), matSidewalk, false, true);
-  addBox(g, length, 0.12, swW, 0, 0.06,  (width/2 + swW/2), matSidewalk, false, true);
-
-  // Dashed centre line
-  const dashLen = 3.0, dashGap = 4.0, dashW = 0.18;
-  const total = dashLen + dashGap;
-  const count = Math.floor(length / total);
-  for (let i = 0; i < count; i++) {
-    const x = -length/2 + total*i + dashLen/2 + 0.5;
-    addBox(g, dashLen, 0.08, dashW, x, 0.07, 0, matMark, false, false);
+  [-1,1].forEach(s=>{
+    const sw = mesh(box(len,.14,2), swMat, false, true);
+    sw.position.set(0,.07,s*(w*.5+1)); g.add(sw);
+  });
+  // Dashes
+  const dL=3.2, gap=4.5, tot=dL+gap, cnt=Math.floor(len/tot);
+  for(let i=0;i<cnt;i++){
+    const d = mesh(box(dL,.1,.18), mMat, false, false);
+    d.position.set(-len/2+tot*i+dL/2+.5,.1,0); g.add(d);
   }
   // Edge lines
-  [-width/2 + 0.3, width/2 - 0.3].forEach(ez => {
-    addBox(g, length, 0.08, 0.15, 0, 0.07, ez, matMark, false, false);
+  [-(w*.5-.25),(w*.5-.25)].forEach(ez=>{
+    const e = mesh(box(len,.1,.14), mMat, false, false);
+    e.position.set(0,.1,ez); g.add(e);
   });
-
-  g.position.set(cx, 0, cz);
-  g.rotation.y = rotY;
+  g.position.set(cx,0,cz); g.rotation.y=rotY;
   scene.add(g);
 }
 
-function addBox(parent, w, h, d, x, y, z, mat, cast=true, recv=true) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-  m.position.set(x, y, z);
-  m.castShadow  = cast;
-  m.receiveShadow = recv;
-  parent.add(m);
-  return m;
+function makeIsland(cx,cz,sz){
+  const m = mesh(box(sz,.1,sz), rMat, false, true);
+  m.position.set(cx,.05,cz); scene.add(m);
 }
 
-// Flat intersection patch
-function makeIntersection(cx, cz, size) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(size, 0.09, size), matRoad);
-  m.position.set(cx, 0.04, cz);
-  m.receiveShadow = true;
-  scene.add(m);
-}
-
-// ── Road Network (Nyamirambo-inspired) ───────────────────
-//  Coords: X = east, Z = south, Y = up
-//  Avenue de la Paix  → main E-W artery, z=0
-//  Rue Nyamirambo     → main N-S,        x=0
-//  Rue du Stade       → E-W secondary,   z=-90 (north)
-//  Rue Biryogo        → E-W secondary,   z=92 (south)
-//  Muhima N-S         → x=-130
-//  Kacyiru N-S        → x=130
-
-makeRoad(  0,   0, 440, 14);          // Avenue de la Paix  (E-W)
-makeRoad(  0,   0, 320, 12, Math.PI/2); // Rue Nyamirambo   (N-S)
-makeRoad( 40, -90, 300, 11);          // Rue du Stade       (E-W, north)
-makeRoad(-20,  92, 240,  9);          // Rue Biryogo        (E-W, south)
-makeRoad(-130, -35, 170,  9, Math.PI/2); // Muhima N-S
-makeRoad( 130,  35, 170,  9, Math.PI/2); // Kacyiru N-S
-makeRoad( -50, -45, 130,  8);         // Short connector NW
-makeRoad(  80,  50, 130,  8);         // Short connector SE
+// ── Nyamirambo road network ──
+makeRoad(  0,   0, 440,14);               // Avenue de la Paix (E-W)
+makeRoad(  0,   0, 320,12,Math.PI/2);     // Rue Nyamirambo (N-S)
+makeRoad( 45, -90, 300,11);               // Rue du Stade (E-W north)
+makeRoad(-22,  92, 240, 9);               // Rue Biryogo (E-W south)
+makeRoad(-130,-38, 170, 9,Math.PI/2);     // Muhima N-S
+makeRoad( 130, 36, 170, 9,Math.PI/2);     // Kacyiru N-S
+makeRoad( -55,-46, 130, 8);              // connector NW
+makeRoad(  78, 50, 130, 8);              // connector SE
 
 // Intersections
-[ [0,0,18], [0,-90,15], [0,92,13], [-130,0,13], [130,0,13],
-  [40,-90,13], [-20,92,11], [-130,92,11], [130,-90,11],
-  [-50,-90,10], [80,92,10], [-50,0,11], [80,0,11] ]
-  .forEach(([x,z,s]) => makeIntersection(x,z,s));
+[[0,0,18],[0,-90,15],[0,92,13],[-130,0,13],[130,0,13],
+ [45,-90,13],[-22,92,11],[-130,92,11],[130,-90,11]].forEach(([x,z,s])=>makeIsland(x,z,s));
 
-// ── Buildings ────────────────────────────────────────────
-function placeBuildings(xMin, xMax, zMin, zMax, count) {
-  const rng = (a,b) => a + Math.random()*(b-a);
-  const rngI = (a,b) => Math.floor(rng(a, b+1));
-  for (let i = 0; i < count; i++) {
-    const bw  = rng(9, 22);
-    const bd  = rng(9, 20);
-    const bh  = rng(6, 36);
-    const bx  = rng(xMin + bw/2, xMax - bw/2);
-    const bz  = rng(zMin + bd/2, zMax - bd/2);
-    const col = PALETTE[rngI(0, PALETTE.length-1)];
-    const mat = new THREE.MeshLambertMaterial({ color: col });
+// ─── Buildings ─────────────────────────────────────────────────
+function placeBlock(xMin,xMax,zMin,zMax,count){
+  for(let i=0;i<count;i++){
+    const bw = rnd(10,24), bd = rnd(10,22), bh = rnd(8,40);
+    const bx = rnd(xMin+bw/2, xMax-bw/2);
+    const bz = rnd(zMin+bd/2, zMax-bd/2);
+    const col = C.bldg[rndI(0,C.bldg.length-1)];
+    const mat = flatMat(col);
 
     // Main block
-    const body = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), mat);
-    body.position.set(bx, bh/2, bz);
-    body.castShadow = true; body.receiveShadow = true;
+    const body = mesh(box(bw,bh,bd), mat, true, true);
+    body.position.set(bx,bh/2,bz);
     scene.add(body);
 
-    // Roof trim (slightly darker)
-    const rc = new THREE.Color(col); rc.multiplyScalar(0.78);
-    const roofMat = new THREE.MeshLambertMaterial({ color: rc });
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(bw+0.1, 0.55, bd+0.1), roofMat);
-    roof.position.set(bx, bh + 0.27, bz);
-    roof.castShadow = true;
-    scene.add(roof);
+    // Slightly darker side panels (same mesh colour darkened)
+    const darkCol = new THREE.Color(col).multiplyScalar(0.82);
+    const sideMat = flatMat(darkCol.getHex());
 
-    // Window rows (2 faces only, simple coloured strips)
-    const winMat = new THREE.MeshLambertMaterial({ color: 0x88AABB, emissive: 0x112233 });
-    const rows = Math.max(1, Math.floor(bh/5));
-    const cols = Math.max(1, Math.floor(bw/4));
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const wx = bx - bw/2 + (c+1)*bw/(cols+1);
-        const wy = 2.5 + r*(bh-3)/rows;
-        const wz = bz + bd/2 + 0.05;
-        const w  = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.4, 0.12), winMat);
-        w.position.set(wx, wy, wz);
-        scene.add(w);
+    // Roof parapet
+    const rph = rnd(0.6,1.8);
+    const rp = mesh(box(bw+.3,rph,bd+.3), sideMat, true, false);
+    rp.position.set(bx,bh+rph/2,bz);
+    scene.add(rp);
+
+    // Rooftop AC/water-tank box (Kigali aesthetic)
+    if(Math.random()>.45){
+      const tw=rnd(2,5), td=rnd(2,4), th=rnd(1.5,3.5);
+      const t2 = mesh(box(tw,th,td), sideMat, true, false);
+      t2.position.set(bx+rnd(-bw*.2,bw*.2), bh+rph+th/2, bz+rnd(-bd*.2,bd*.2));
+      scene.add(t2);
+    }
+
+    // Stepped top on taller buildings
+    if(bh>22 && Math.random()>.4){
+      const sw2=bw*.6, sd2=bd*.6, sh2=rnd(4,8);
+      const step = mesh(box(sw2,sh2,sd2), mat, true, false);
+      step.position.set(bx,bh+rph+sh2/2,bz);
+      scene.add(step);
+    }
+
+    // Window column (emissive strips = lit windows)
+    const winMat = new THREE.MeshStandardMaterial({
+      color:0x88AABB, emissive:new THREE.Color(0xFFEEBB), emissiveIntensity:.6,
+      flatShading:true
+    });
+    const darkWin = flatMat(0x0A1520);
+    const cols2 = Math.max(1,Math.floor(bw/5));
+    const rows2 = Math.max(1,Math.floor(bh/5));
+    for(let r=0;r<rows2;r++){
+      for(let c=0;c<cols2;c++){
+        if(Math.random()>.55) continue; // skip some windows
+        const wx = bx - bw/2 + (c+.5)*(bw/cols2);
+        const wy = 2.5 + r*(bh-3)/rows2;
+        const wz = bz + bd/2 + .06;
+        const wm = Math.random()>.35 ? winMat : darkWin;
+        const wn = mesh(box(.9,1.2,.1), wm, false, false);
+        wn.position.set(wx,wy,wz);
+        scene.add(wn);
       }
     }
   }
 }
 
-// Block zones (carefully outside road bands)
-// N of main ave (z < -9), S of main ave (z > 9)
-// W of center (x < -8), E of center (x > 8)
-placeBuildings(-210, -145, -155, -98,  7);  // far NW
-placeBuildings(-210, -145,  -96,  -9,  8);  // NW inner
-placeBuildings(-122,   -9,  -96,  -9, 10);  // N center
-placeBuildings(    9,  120,  -96,  -9,  9); // NE inner
-placeBuildings(  135,  210,  -96,  -9,  7); // far NE
+// City blocks (safe from roads)
+placeBlock(-210,-145,  10,  82,  7);
+placeBlock(-122,  -9,  10,  82, 12);
+placeBlock(   9, 120,  10,  82, 10);
+placeBlock( 138, 210,  10,  82,  7);
+placeBlock(-210,-145, -82, -10,  7);
+placeBlock(-122,  -9, -82, -10, 10);
+placeBlock(   9, 120, -82, -10,  9);
+placeBlock( 138, 210, -82, -10,  7);
+placeBlock(-210,-145,  84, 155,  5);
+placeBlock( 138, 210, -98,-165,  5);
+placeBlock(   9, 120, -98,-165,  6);
+placeBlock(-122,  -9,  84, 155,  6);
 
-placeBuildings(-210, -145,    9,  86,  7);  // SW outer
-placeBuildings(-122,   -9,    9,  86, 10);  // S center (market district)
-placeBuildings(    9,  120,    9,  86,  9); // SE inner
-placeBuildings(  135,  210,    9,  86,  7); // far SE
+// ─── Trees ─────────────────────────────────────────────────────
+const trunkM = flatMat(0x3A2010);
+const leaf1  = flatMat(0x1D5C20);
+const leaf2  = flatMat(0x2A7A2A);
 
-placeBuildings(-210, -145,  -98, -155,  5); // deep NW
-placeBuildings(  135,  210,   98,  155,  5); // deep SE
-placeBuildings(    9,  120,  -98, -155,  6); // deep N
-placeBuildings(-122,   -9,   98,  155,  6); // deep S
-
-// ── Trees ─────────────────────────────────────────────────
-function placeTree(x, z) {
-  const trunkMat = new THREE.MeshLambertMaterial({ color:0x4A2F1A });
-  const leafMat  = new THREE.MeshLambertMaterial({ color:0x2A6628 });
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 2.8, 8), trunkMat);
-  trunk.position.set(x, 1.4, z);
-  trunk.castShadow = true;
-  scene.add(trunk);
-  // Two overlapping cones for a fuller tree
-  [0, 1.8].forEach((yo, i) => {
-    const r = 2.4 - i*0.6, h = 4.5 - i*1;
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(r, h, 8), leafMat);
-    cone.position.set(x, 4.5 + yo, z);
-    cone.castShadow = true;
-    scene.add(cone);
-  });
-}
-
-// Trees lining Avenue de la Paix
-for (let i = -9; i <= 9; i++) {
-  if (Math.abs(i) < 2) continue;
-  placeTree(i * 22, -10);
-  placeTree(i * 22,  10);
-}
-// Trees lining Rue Nyamirambo
-for (let j = -7; j <= 7; j++) {
-  if (Math.abs(j) < 2) continue;
-  placeTree(-10, j * 20);
-  placeTree( 10, j * 20);
-}
-
-// ── Street Lights ─────────────────────────────────────────
-function placeLight(x, z) {
-  const poleMat = new THREE.MeshLambertMaterial({ color:0x6A6A6A });
-  const lampMat = new THREE.MeshLambertMaterial({ color:0xFFEE88, emissive:0xFFDD44, emissiveIntensity:0.8 });
+function placeTree(x,z){
   const g = new THREE.Group();
-  // Pole
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 7, 8), poleMat);
-  pole.position.y = 3.5; pole.castShadow = true;
-  g.add(pole);
-  // Arm
-  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 2.0), poleMat);
-  arm.position.set(0, 7.1, 1.0);
-  g.add(arm);
-  // Lamp globe
-  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), lampMat);
-  lamp.position.set(0, 6.8, 2.0);
-  g.add(lamp);
-  g.position.set(x, 0, z);
+  const trunk = mesh(cyl(.2,.28,3,6), trunkM);
+  trunk.position.y=1.5; g.add(trunk);
+  // 3 stacked cones — indie-game tree
+  [[2.8,5.5,0],[2.2,4,2],[1.5,3,3.8]].forEach(([r,h,y],i)=>{
+    const lf = mesh(cone(r,h,7), i%2===0?leaf1:leaf2);
+    lf.position.y=y; lf.rotation.y=Math.random()*Math.PI;
+    g.add(lf);
+  });
+  g.position.set(x,0,z);
   scene.add(g);
 }
 
-[-176,-110,-44,22,88,154].forEach(x => { placeLight(x,-11); placeLight(x, 11); });
-[-100,-60,-20,20,60,100].forEach(z => { placeLight(-11,z); placeLight( 11,z); });
+for(let i=-9;i<=9;i++){ if(Math.abs(i)<2) continue; placeTree(i*22,-11); placeTree(i*22,11); }
+for(let j=-7;j<=7;j++){ if(Math.abs(j)<2) continue; placeTree(-11,j*20); placeTree(11,j*20); }
 
-// ═══════════════════════════════════════════════════════════
-//  PLAYER MOTO
-// ═══════════════════════════════════════════════════════════
-function buildMoto() {
+// ─── Street Lights ─────────────────────────────────────────────
+const poleMat  = flatMat(0x5A5A5A);
+const globeMat = new THREE.MeshStandardMaterial({
+  color:0xFFEE88, emissive:new THREE.Color(0xFFDD44), emissiveIntensity:2.0,
+  flatShading:true
+});
+
+function placeLight(x,z){
+  const g = new THREE.Group();
+  add(g, cyl(.07,.1,7,8),  poleMat, 0,3.5,0);
+  add(g, box(.08,.1,2.0),  poleMat, 0,7.1,1.0);
+  add(g, new THREE.SphereGeometry(.28,8,6), globeMat, 0,6.8,2.0, 0,0,0, false,false);
+  g.position.set(x,0,z); scene.add(g);
+}
+
+[-180,-110,-44,22,88,154].forEach(x=>{ placeLight(x,-12); placeLight(x,12); });
+[-110,-60,-20,20,60,110].forEach(z=>{ placeLight(-12,z); placeLight(12,z); });
+
+// ═══════════════════════════════════════════════════════════════
+//  PLAYER MOTO  —  flat-shaded, designed proportions
+// ═══════════════════════════════════════════════════════════════
+const redP    = stdMat(C.paint,  .28, .42);
+const chrP    = stdMat(C.chrome, .08, .92);
+const darkP   = stdMat(C.dark,   .7,  .1);
+const orgP    = stdMat(C.orange, .5,  .05);
+const yelP    = stdMat(C.yellow, .3,  .1);
+
+function buildMoto(){
   const g = new THREE.Group();
 
-  // Chassis (red — iconic Rwanda moto taxi)
-  const chassisMat = new THREE.MeshLambertMaterial({ color:0xBB1111 });
-  const darkMat    = new THREE.MeshLambertMaterial({ color:0x1A1A1A });
-  const chromeMat  = new THREE.MeshLambertMaterial({ color:0xCCCCCC });
+  // ── Chassis ──
+  add(g,box(1.8,.42,.8),  darkP, 0,.21,0);   // lower
+  add(g,box(1.5,.6,.76),  redP,  -.05,.72,0); // tank/body
+  add(g,box(1.,.2,.7),   darkP, -.32,1.08,0); // seat
+  add(g,box(.36,.54,.72), redP,  .80,.76,0);   // front fairing
+  add(g,box(.5,.1,.82),   redP,  .80,.18,0);   // front mudguard
+  add(g,box(.5,.1,.82),   redP, -.80,.18,0);   // rear mudguard
 
-  // Lower engine block
-  addBox(g, 1.7, 0.45, 0.80, 0, 0.22, 0, darkMat);
-  // Body / tank
-  addBox(g, 1.5, 0.65, 0.78, -0.05, 0.72, 0, chassisMat);
-  // Seat
-  addBox(g, 0.9, 0.18, 0.68, -0.3, 1.08, 0, darkMat);
-  // Front fairing
-  addBox(g, 0.32, 0.52, 0.72, 0.80, 0.78, 0, chassisMat);
-  // Mudguards
-  addBox(g, 0.55, 0.12, 0.82,  0.80, 0.20, 0, chassisMat);
-  addBox(g, 0.55, 0.12, 0.82, -0.80, 0.20, 0, chassisMat);
+  // ── Handlebars + Fork ──
+  const hb = mesh(cyl(.04,.04,1.,8), chrP);
+  hb.rotation.z=Math.PI/2; hb.position.set(.72,1.1,0); g.add(hb);
+  add(g,box(.09,.7,.09), chrP, .82,.55,0); // fork
 
-  // Handlebars
-  const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 8), chromeMat);
-  hb.rotation.z = Math.PI/2; hb.position.set(0.72, 1.10, 0);
-  g.add(hb);
-  // Fork
-  const fork = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.72, 0.10), chromeMat);
-  fork.position.set(0.82, 0.56, 0); g.add(fork);
-  // Exhaust pipe
-  const ex = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.9, 8), chromeMat);
-  ex.rotation.z = Math.PI/2; ex.position.set(-0.45, 0.14, 0.38);
-  g.add(ex);
-  // Headlight
-  const hlMat = new THREE.MeshLambertMaterial({ color:0xFFFFCC, emissive:0xFFFF88, emissiveIntensity:1.2 });
-  const hl = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), hlMat);
-  hl.position.set(1.00, 0.82, 0); g.add(hl);
-  // Tail light
-  const tlMat = new THREE.MeshLambertMaterial({ color:0xFF2200, emissive:0xFF1100, emissiveIntensity:1.0 });
-  const tl = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.10, 0.60), tlMat);
-  tl.position.set(-0.95, 0.92, 0); g.add(tl);
+  // ── Exhaust ──
+  const ex = mesh(cyl(.06,.08,.9,8), chrP);
+  ex.rotation.z=Math.PI/2; ex.position.set(-.45,.13,.38); g.add(ex);
 
-  // Wheels (cylinder rotated 90° on Z)
-  const wheelMat  = new THREE.MeshLambertMaterial({ color:0x111111 });
-  const rimMat    = new THREE.MeshLambertMaterial({ color:0xAAAAAA });
-  [0.85, -0.85].forEach(wx => {
-    const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.19, 18), wheelMat);
-    wh.rotation.z = Math.PI/2; wh.position.set(wx, 0.44, 0);
-    wh.castShadow = true; g.add(wh);
-    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.21, 12), rimMat);
-    rim.rotation.z = Math.PI/2; rim.position.set(wx, 0.44, 0);
-    g.add(rim);
+  // ── Headlight (emissive) ──
+  const hlM = new THREE.MeshStandardMaterial({
+    color:0xFFFFCC, emissive:new THREE.Color(0xFFFF88), emissiveIntensity:3.0, flatShading:true
+  });
+  add(g,new THREE.SphereGeometry(.15,8,6), hlM, 1.02,.82,0, 0,0,0, false,false);
+
+  // ── Tail light ──
+  const tlM = new THREE.MeshStandardMaterial({
+    color:0xFF2200, emissive:new THREE.Color(0xFF1100), emissiveIntensity:2.0, flatShading:true
+  });
+  add(g,box(.24,.1,.60), tlM, -.96,.9,0, 0,0,0, false,false);
+
+  // ── Wheels ──
+  const wGeo = cyl(.44,.44,.19,16);
+  const rGeo = cyl(.26,.26,.21,12);
+  const wMat = stdMat(C.dark,.8,.1);
+  const rMat2 = stdMat(C.chrome,.08,.92);
+  [.87,-.87].forEach(wx=>{
+    const w=mesh(wGeo,wMat); w.rotation.z=Math.PI/2; w.position.set(wx,.44,0); g.add(w);
+    const r=mesh(rGeo,rMat2); r.rotation.z=Math.PI/2; r.position.set(wx,.44,0); g.add(r);
   });
 
-  // ── Rider ─────────────────────────────────────────────
-  const orangeMat  = new THREE.MeshLambertMaterial({ color:0xEE6600 }); // jacket
-  const jeansBlue  = new THREE.MeshLambertMaterial({ color:0x2244AA }); // trousers
-  const helmMat    = new THREE.MeshLambertMaterial({ color:0xFFCC00 }); // yellow helmet
-  const helmetVisor = new THREE.MeshLambertMaterial({ color:0x336688, emissive:0x112233 });
-  const skinMat    = new THREE.MeshLambertMaterial({ color:0x8B5E3C });
-
-  // Torso
-  addBox(g, 0.50, 0.72, 0.52, -0.12, 1.56, 0, orangeMat);
-  // Arms
-  addBox(g, 0.60, 0.18, 0.18, 0.18, 1.74, -0.32, orangeMat);
-  addBox(g, 0.60, 0.18, 0.18, 0.18, 1.74,  0.32, orangeMat);
-  // Legs
-  addBox(g, 0.60, 0.18, 0.18, 0.14, 1.08, -0.28, jeansBlue);
-  addBox(g, 0.60, 0.18, 0.18, 0.14, 1.08,  0.28, jeansBlue);
+  // ── Rider ──
+  add(g,box(.48,.7,.52), orgP, -.12,1.54,0);        // torso
+  add(g,box(.58,.16,.18), orgP, .18,1.72,-.30);      // L arm
+  add(g,box(.58,.16,.18), orgP, .18,1.72, .30);      // R arm
+  add(g,box(.56,.16,.18), stdMat(0x223399,.7,.05), .14,1.07,-.27); // L leg
+  add(g,box(.56,.16,.18), stdMat(0x223399,.7,.05), .14,1.07, .27); // R leg
   // Helmet
-  const helm = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 10), helmMat);
-  helm.position.set(-0.08, 2.05, 0); helm.castShadow = true; g.add(helm);
+  const helm = mesh(new THREE.SphereGeometry(.27,10,8), yelP);
+  helm.position.set(-.08,2.02,0); g.add(helm);
   // Visor
-  const visor = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.46), helmetVisor);
-  visor.position.set(0.12, 2.02, 0); g.add(visor);
+  add(g,box(.3,.13,.50), stdMat(0x336688,.1,.05), .14,2.,.0, 0,0,0, false,false);
+  // Helmet chin
+  add(g,box(.18,.1,.50), yelP, .16,1.84,.0);
 
-  g.name = 'moto';
+  g.name='moto';
   return g;
 }
 
 const moto = buildMoto();
-moto.position.set(8, 0, 2);
-moto.rotation.y = Math.PI; // faces west initially
+moto.position.set(10,0,2);
+moto.rotation.y = Math.PI;
 scene.add(moto);
 
-// Wheel refs for spinning animation
-const wheels = [];
-moto.traverse(c => {
-  if (c.isMesh && c.geometry.type === 'CylinderGeometry' && c.geometry.parameters.radiusTop > 0.3) {
-    wheels.push(c);
-  }
+// Wheel refs for spin animation
+const motoWheels=[];
+moto.traverse(c=>{
+  if(c.isMesh && c.geometry.type==='CylinderGeometry' && c.geometry.parameters.radiusTop>.35)
+    motoWheels.push(c);
 });
 
-// ═══════════════════════════════════════════════════════════
-//  TRAFFIC VEHICLES
-// ═══════════════════════════════════════════════════════════
-function buildVehicle(col, type) {
-  const g = new THREE.Group();
-  const mat  = new THREE.MeshLambertMaterial({ color: col });
-  const dark = new THREE.MeshLambertMaterial({ color:0x111111 });
-  const glassMat = new THREE.MeshLambertMaterial({ color:0x557799, transparent:true, opacity:0.7 });
+// ═══════════════════════════════════════════════════════════════
+//  TRAFFIC  —  stylized flat-shaded vehicles
+// ═══════════════════════════════════════════════════════════════
+function buildVehicle(col,type){
+  const g  = new THREE.Group();
+  const bm = flatMat(col);
+  const wm = flatMat(C.dark);
+  const gm = new THREE.MeshStandardMaterial({color:0x557799,transparent:true,opacity:.55,flatShading:true});
 
-  if (type === 'bus') {
-    // Minibus (Twende vibes)
-    addBox(g, 5.0, 2.0, 2.1, 0, 1.3, 0, mat);
-    addBox(g, 4.8, 0.35, 2.05, 0, 2.35, 0, new THREE.MeshLambertMaterial({ color:0xFFFFFF }));
-    // Side windows
-    for (let i = -1.5; i <= 1.5; i += 1.2) {
-      addBox(g, 0.9, 0.55, 0.08, i, 1.55, -1.06, glassMat, false, false);
-      addBox(g, 0.9, 0.55, 0.08, i, 1.55,  1.06, glassMat, false, false);
-    }
-    addBox(g, 0.08, 0.55, 1.5, -2.52, 1.55, 0, glassMat, false, false); // rear glass
-  } else if (type === 'suv') {
-    addBox(g, 4.5, 1.3, 2.0, 0, 0.9, 0, mat);
-    addBox(g, 3.5, 0.9, 1.9, -0.2, 1.95, 0, mat);
-    addBox(g, 0.08, 0.65, 1.6, -2.0, 1.62, 0, glassMat, false, false);
-  } else {
-    // Sedan
-    addBox(g, 4.0, 1.0, 1.85, 0, 0.78, 0, mat);
-    addBox(g, 2.4, 0.80, 1.75, -0.25, 1.72, 0, mat);
-    addBox(g, 0.08, 0.6, 1.4, -2.05, 1.5, 0, glassMat, false, false);
+  if(type==='bus'){
+    add(g,box(5.,.2,2.2),  flatMat(0xFFFFFF), 0,2.3,0);  // white roof stripe
+    add(g,box(4.8,2.1,2.1), bm, 0,1.2,0);
+    [-1.4,-.2,1.0].forEach(wz=>{ add(g,box(.08,.5,1.2),gm,.08,1.55,wz,0,0,0,false,false); });
+  }else if(type==='suv'){
+    add(g,box(4.4,1.25,2.0), bm, 0,.9,0);
+    add(g,box(3.4,.85,1.88), bm, -.2,1.96,0);
+    add(g,box(.08,.6,1.5),gm,-2.0,1.62,0,0,0,0,false,false);
+  }else{
+    add(g,box(4.,.98,1.82), bm, 0,.76,0);
+    add(g,box(2.4,.76,1.72), bm, -.28,1.68,0);
+    add(g,box(.08,.55,1.3),gm,-2.05,1.5,0,0,0,0,false,false);
   }
 
-  // Wheels x4
-  const wGeo = new THREE.CylinderGeometry(0.40, 0.40, 0.22, 14);
-  [[1.35,-0.88],[1.35,0.88],[-1.35,-0.88],[-1.35,0.88]].forEach(([wx,wz]) => {
-    const w = new THREE.Mesh(wGeo, dark);
-    w.rotation.z = Math.PI/2; w.position.set(wx, 0.40, wz);
-    w.castShadow = true; g.add(w);
+  // Wheels ×4
+  [[ 1.35,-.88],[1.35,.88],[-1.35,-.88],[-1.35,.88]].forEach(([wx,wz])=>{
+    const w=mesh(cyl(.38,.38,.22,12),wm); w.rotation.z=Math.PI/2; w.position.set(wx,.38,wz); g.add(w);
+    const rr=mesh(cyl(.22,.22,.24,10),flatMat(0xAAAAAA)); rr.rotation.z=Math.PI/2; rr.position.set(wx,.38,wz); g.add(rr);
   });
 
-  // Headlights / taillights
-  const hlMat = new THREE.MeshLambertMaterial({ color:0xFFFFCC, emissive:0xFFFF88 });
-  const tlMat = new THREE.MeshLambertMaterial({ color:0xFF1100, emissive:0xFF0000 });
-  addBox(g, 0.08, 0.20, 0.35,  2.02, 0.88, -0.6, hlMat, false, false);
-  addBox(g, 0.08, 0.20, 0.35,  2.02, 0.88,  0.6, hlMat, false, false);
-  addBox(g, 0.08, 0.18, 0.30, -2.02, 0.88, -0.6, tlMat, false, false);
-  addBox(g, 0.08, 0.18, 0.30, -2.02, 0.88,  0.6, tlMat, false, false);
+  // Lights
+  const hm=new THREE.MeshStandardMaterial({color:0xFFFFCC,emissive:new THREE.Color(0xFFFF88),emissiveIntensity:2.5,flatShading:true});
+  const tm=new THREE.MeshStandardMaterial({color:0xFF2200,emissive:new THREE.Color(0xFF0000),emissiveIntensity:2.5,flatShading:true});
+  add(g,box(.08,.2,.32), hm,  2.02,.88,-.55,0,0,0,false,false);
+  add(g,box(.08,.2,.32), hm,  2.02,.88, .55,0,0,0,false,false);
+  add(g,box(.08,.18,.28),tm, -2.02,.88,-.55,0,0,0,false,false);
+  add(g,box(.08,.18,.28),tm, -2.02,.88, .55,0,0,0,false,false);
 
-  g.castShadow = true;
   return g;
 }
 
-// Traffic definitions: [startX, startZ, route[[x,z],...], speed, color, type, laneOffset]
-const TRAFFIC_DEFS = [
-  { route:[[-215,0],[215,0]], sp:0.16, col:0x2255AA, type:'sedan',  lane: 3.5 },
-  { route:[[215,0],[-215,0]], sp:0.13, col:0xEEEEDD, type:'bus',    lane:-3.5 },
-  { route:[[0,-155],[0,155]], sp:0.18, col:0xFF8800, type:'sedan',  lane: 3.0 },
-  { route:[[0,155],[0,-155]], sp:0.15, col:0x228833, type:'suv',    lane:-3.0 },
-  { route:[[-140,-90],[180,-90]], sp:0.14, col:0xCC4444, type:'bus', lane: 3.2 },
-  { route:[[180,-90],[-140,-90]], sp:0.12, col:0x9944BB, type:'sedan', lane:-3.2 },
-  { route:[[-120,92],[100,92]], sp:0.17, col:0x44AACC, type:'sedan', lane: 3.0 },
-  { route:[[100,92],[-120,92]], sp:0.11, col:0xDDAA22, type:'suv',  lane:-3.0 },
+const TDEFS=[
+  {route:[[-215,0],[215,0]],  sp:.15, col:C.cars[0], type:'sedan', lane: 3.5},
+  {route:[[215,0],[-215,0]],  sp:.12, col:C.cars[1], type:'bus',   lane:-3.5},
+  {route:[[0,-155],[0,155]],  sp:.17, col:C.cars[2], type:'sedan', lane: 3.0},
+  {route:[[0,155],[0,-155]],  sp:.14, col:C.cars[3], type:'suv',   lane:-3.0},
+  {route:[[-140,-90],[180,-90]],sp:.13,col:C.cars[4],type:'bus',   lane: 3.2},
+  {route:[[180,-90],[-140,-90]],sp:.11,col:C.cars[5],type:'sedan', lane:-3.2},
+  {route:[[-120,92],[100,92]], sp:.16, col:C.cars[6], type:'sedan', lane: 3.0},
+  {route:[[100,92],[-120,92]], sp:.10, col:C.cars[7], type:'suv',   lane:-3.0},
 ];
 
-const trafficCars = TRAFFIC_DEFS.map(def => {
-  const car = buildVehicle(def.col, def.type);
-  car.position.set(def.route[0][0], 0, def.route[0][1]);
-  car.userData = { route: def.route, rIdx:0, t:0, sp:def.sp, lane:def.lane };
-  scene.add(car);
-  return car;
+const traffic = TDEFS.map(d=>{
+  const c=buildVehicle(d.col,d.type);
+  c.position.set(d.route[0][0],0,d.route[0][1]);
+  c.userData={...d,rIdx:0,t:0};
+  scene.add(c); return c;
 });
 
-// ═══════════════════════════════════════════════════════════
-//  MISSION MARKERS
-// ═══════════════════════════════════════════════════════════
-const MISSIONS = [
-  { pu:{x: 35,z:  -3,name:'Nyamirambo Market'},   do:{x:-60,z:-92,name:'Mosque Corner'},       tip:1500 },
-  { pu:{x:-75,z:   4,name:'Biryogo Junction'},     do:{x:140,z: -3,name:'KBC Hill'},             tip:2000 },
-  { pu:{x:165,z: -92,name:'Stade Road East'},      do:{x:-95,z: 94,name:'Muhima Junction'},      tip:1800 },
-  { pu:{x:-135,z:-58,name:'Muhima Road'},          do:{x: 35,z:  2,name:'Nyamirambo Market'},   tip:1600 },
-  { pu:{x: 90,z:  94,name:'Biryogo Heights'},      do:{x:-95,z:-92,name:'Stadium North'},        tip:2500 },
-  { pu:{x:-95,z:  94,name:'Stadium South'},        do:{x:155,z: 94,name:'KBC Heights'},          tip:3000 },
+// ═══════════════════════════════════════════════════════════════
+//  MISSION MARKERS  —  glowing beacon columns
+// ═══════════════════════════════════════════════════════════════
+const MISSIONS=[
+  {pu:{x:35,z:-3,n:'Nyamirambo Market'},    do:{x:-60,z:-92,n:'Mosque Corner'},      tip:1500},
+  {pu:{x:-75,z:4,n:'Biryogo Junction'},     do:{x:140,z:-3,n:'KBC Hill'},             tip:2000},
+  {pu:{x:165,z:-92,n:'Stade Road East'},    do:{x:-95,z:94,n:'Muhima Junction'},      tip:1800},
+  {pu:{x:-135,z:-58,n:'Muhima Road'},       do:{x:35,z:2,n:'Nyamirambo Market'},      tip:1600},
+  {pu:{x:90,z:94,n:'Biryogo Heights'},      do:{x:-95,z:-92,n:'Stadium North'},       tip:2500},
+  {pu:{x:-95,z:94,n:'Stadium South'},       do:{x:155,z:94,n:'KBC Heights'},          tip:3000},
 ];
 
-function makePulse(color) {
+function makeBeacon(col){
   const g = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color, emissive:color, emissiveIntensity:0.6 });
+  const em = new THREE.MeshStandardMaterial({color:col,emissive:new THREE.Color(col),emissiveIntensity:1.5,flatShading:true});
+
   // Ground ring
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.22, 8, 40), mat);
-  ring.rotation.x = Math.PI/2; g.add(ring);
-  // Vertical pole
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 6, 8), mat);
-  pole.position.y = 3; g.add(pole);
-  // Top beacon
-  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 6), mat);
-  beacon.position.y = 6.2; g.add(beacon);
-  // Arrow cone pointing down
-  const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.5, 8), mat);
-  arrow.rotation.x = Math.PI; arrow.position.y = 4.8; g.add(arrow);
+  const ring=mesh(tor(2.8,.24,8,40),em,false,false);
+  ring.rotation.x=Math.PI/2; g.add(ring);
+  // Pulsing outer ring
+  const ring2=mesh(tor(3.8,.12,8,40),em,false,false);
+  ring2.rotation.x=Math.PI/2; ring2.scale.setScalar(.7); g.add(ring2);
+  // Vertical spike
+  const spike=mesh(cyl(.1,.3,8,6),em,false,false);
+  spike.position.y=4; g.add(spike);
+  // Beacon top
+  const top=mesh(new THREE.OctahedronGeometry(.6,0),em,false,false);
+  top.position.y=8; g.add(top);
+  // Store refs for animation
+  g.userData.ring2=ring2; g.userData.top=top;
   return g;
 }
 
-let pickupMarker = null, dropoffMarker = null;
+let puMarker=null, doMarker=null;
 
-function setMarkers(missionIdx, phase) {
-  if (pickupMarker)  { scene.remove(pickupMarker);  pickupMarker  = null; }
-  if (dropoffMarker) { scene.remove(dropoffMarker); dropoffMarker = null; }
-  const m = MISSIONS[missionIdx];
-  if (phase === 'PICKUP') {
-    pickupMarker = makePulse(0x00FF88);
-    pickupMarker.position.set(m.pu.x, 0, m.pu.z);
-    scene.add(pickupMarker);
-    document.getElementById('mission-text').textContent = `🏃 Pick up · ${m.pu.name}`;
+function setMarkers(idx,phase){
+  if(puMarker){scene.remove(puMarker);puMarker=null;}
+  if(doMarker){scene.remove(doMarker);doMarker=null;}
+  const m=MISSIONS[idx];
+  if(phase==='PICKUP'){
+    puMarker=makeBeacon(0x00FF88);
+    puMarker.position.set(m.pu.x,0,m.pu.z);
+    scene.add(puMarker);
+    document.getElementById('mtext').textContent=`🏃 Pick up · ${m.pu.n}`;
   } else {
-    dropoffMarker = makePulse(0xFFD700);
-    dropoffMarker.position.set(m.do.x, 0, m.do.z);
-    scene.add(dropoffMarker);
-    document.getElementById('mission-text').textContent = `📍 Drop off · ${m.do.name}`;
+    doMarker=makeBeacon(0xFFB830);
+    doMarker.position.set(m.do.x,0,m.do.z);
+    scene.add(doMarker);
+    document.getElementById('mtext').textContent=`📍 Drop off · ${m.do.n}`;
   }
 }
 
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  SPEED LINES CANVAS  —  FP immersion
+// ═══════════════════════════════════════════════════════════════
+const linesCanvas = document.getElementById('lines');
+const lCtx = linesCanvas.getContext('2d');
+function resizeLines(){ linesCanvas.width=innerWidth; linesCanvas.height=innerHeight; }
+resizeLines();
+
+function drawSpeedLines(spd){
+  linesCanvas.width = linesCanvas.width; // clear
+  const cx=linesCanvas.width/2, cy=linesCanvas.height/2;
+  const alpha = Math.min(1,(spd-.3)/.7) * .6;
+  if(alpha<=0) return;
+  lCtx.strokeStyle = `rgba(255,220,150,${alpha})`;
+  for(let i=0;i<40;i++){
+    const angle=Math.random()*Math.PI*2;
+    const r0=Math.max(cx,cy)*.3;
+    const r1=Math.max(cx,cy)*(1+Math.random()*.5);
+    lCtx.lineWidth=Math.random()*1.5+.3;
+    lCtx.beginPath();
+    lCtx.moveTo(cx+Math.cos(angle)*r0, cy+Math.sin(angle)*r0);
+    lCtx.lineTo(cx+Math.cos(angle)*r1, cy+Math.sin(angle)*r1);
+    lCtx.stroke();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  GAME STATE
-// ═══════════════════════════════════════════════════════════
-let gameRunning  = false;
-let missionIdx   = 0;
-let phase        = 'PICKUP';
-let currentTip   = 0;
-let totalEarned  = 0;
-let crashCooldown = 0;
-let tipDecay     = null;
-let camMode      = '3rd'; // '3rd' | '1st'
+// ═══════════════════════════════════════════════════════════════
+let gameRunning=false, mIdx=0, phase='PICKUP';
+let curTip=0, earned=0, crashCD=0;
+let tipTimer=null, camMode='3rd';
+let mSpeed=0;
 
 // Camera smooth state
-const cam3Target = new THREE.Vector3();
-const cam3Pos    = new THREE.Vector3();
+const c3Pos=new THREE.Vector3(), c3Look=new THREE.Vector3();
 
-// ── Controls ──────────────────────────────────────────────
-const keys = {};
-document.addEventListener('keydown', e => {
-  keys[e.code] = true;
-  if (e.code === 'KeyV') toggleCam();
-});
-document.addEventListener('keyup', e => { keys[e.code] = false; });
+// Controls
+const keys={};
+document.addEventListener('keydown',e=>{keys[e.code]=true; if(e.code==='KeyV') toggleCam();});
+document.addEventListener('keyup',e=>keys[e.code]=false);
 
 // Joystick
-let joyActive = false, joyX = 0, joyY = 0;
-const JOY_R = 37;
-const joyBase = document.getElementById('joy-base');
-const joyKnob = document.getElementById('joy-knob');
-joyBase.addEventListener('touchstart', e => { joyActive=true; e.preventDefault(); }, {passive:false});
-joyBase.addEventListener('touchend',   () => { joyActive=false; joyX=0; joyY=0; joyKnob.style.transform=''; });
-joyBase.addEventListener('touchmove',  e => {
+let jActive=false,jX=0,jY=0;
+const jBase=document.getElementById('jbase');
+const jKnob=document.getElementById('jknob');
+jBase.addEventListener('touchstart',e=>{jActive=true;e.preventDefault();},{passive:false});
+jBase.addEventListener('touchend',()=>{jActive=false;jX=0;jY=0;jKnob.style.transform='';});
+jBase.addEventListener('touchmove',e=>{
   e.preventDefault();
-  const r = joyBase.getBoundingClientRect();
-  let dx = e.touches[0].clientX - (r.left + r.width/2);
-  let dy = e.touches[0].clientY - (r.top  + r.height/2);
-  const d = Math.sqrt(dx*dx+dy*dy);
-  if (d > JOY_R) { dx=dx/d*JOY_R; dy=dy/d*JOY_R; }
-  joyX = dx/JOY_R; joyY = dy/JOY_R;
-  joyKnob.style.transform = `translate(${dx}px,${dy}px)`;
-}, {passive:false});
+  const r=jBase.getBoundingClientRect();
+  let dx=e.touches[0].clientX-(r.left+r.width/2);
+  let dy=e.touches[0].clientY-(r.top+r.height/2);
+  const d=Math.sqrt(dx*dx+dy*dy), J=38;
+  if(d>J){dx=dx/d*J;dy=dy/d*J;}
+  jX=dx/J;jY=dy/J;
+  jKnob.style.transform=`translate(${dx}px,${dy}px)`;
+},{passive:false});
 
-// ── Moto physics state ────────────────────────────────────
-let motoSpeed = 0;
-
-function startGame() {
-  document.getElementById('start-screen').style.display = 'none';
-  document.getElementById('hud').style.display = 'block';
-  gameRunning = true;
-  missionIdx  = 0;
-  phase       = 'PICKUP';
-  totalEarned = 0;
-  buildProgressDots();
-  setMarkers(0, 'PICKUP');
-  currentTip = MISSIONS[0].tip;
-  updateHUD();
+// ─── Game functions ────────────────────────────────────────────
+function startGame(){
+  document.getElementById('start').style.display='none';
+  document.getElementById('hud').style.display='block';
+  gameRunning=true; mIdx=0; phase='PICKUP'; earned=0;
+  buildDots(); setMarkers(0,'PICKUP'); curTip=MISSIONS[0].tip; updateHUD();
 }
 
-function toggleCam() {
-  camMode = camMode === '3rd' ? '1st' : '3rd';
-  document.getElementById('cam-btn').textContent =
-    camMode === '3rd' ? '👁 1ST PERSON' : '🎥 3RD PERSON';
+function toggleCam(){
+  camMode = camMode==='3rd'?'1st':'3rd';
+  document.getElementById('cambtn').textContent = camMode==='3rd'?'👁 FIRST PERSON':'🎥 THIRD PERSON';
+  document.getElementById('lines').style.opacity = camMode==='1st'?'1':'0';
 }
 
-function buildProgressDots() {
-  const wrap = document.getElementById('progress');
-  wrap.innerHTML = '';
-  MISSIONS.forEach((_, i) => {
-    const d = document.createElement('div');
-    d.className = 'dot' + (i===0 ? ' active' : '');
-    d.id = `dot-${i}`;
-    wrap.appendChild(d);
+function buildDots(){
+  const w=document.getElementById('dots'); w.innerHTML='';
+  MISSIONS.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='dot'+(i===0?' now':'');
+    d.id=`d${i}`; w.appendChild(d);
   });
 }
-
-function refreshDots() {
-  MISSIONS.forEach((_, i) => {
-    const d = document.getElementById(`dot-${i}`);
-    if (!d) return;
-    d.className = 'dot' + (i < missionIdx ? ' done' : i===missionIdx ? ' active' : '');
+function refreshDots(){
+  MISSIONS.forEach((_,i)=>{
+    const d=document.getElementById(`d${i}`);
+    if(d) d.className='dot'+(i<mIdx?' done':i===mIdx?' now':'');
   });
 }
-
-function updateHUD() {
-  if (phase === 'DROPOFF') {
-    document.getElementById('tip-val').textContent = currentTip.toLocaleString() + ' RWF ⏱';
-    document.getElementById('tip-val').style.color = '#FFD700';
+function updateHUD(){
+  if(phase==='DROPOFF'){
+    document.getElementById('mtip').textContent=curTip.toLocaleString()+' RWF ⏱';
+    document.getElementById('mtip').style.color='#FFB830';
   } else {
-    document.getElementById('tip-val').textContent = totalEarned.toLocaleString() + ' RWF earned';
-    document.getElementById('tip-val').style.color = '#00ff88';
+    document.getElementById('mtip').textContent=earned.toLocaleString()+' RWF';
+    document.getElementById('mtip').style.color='#00E5A0';
   }
 }
 
-// ── Traffic update ────────────────────────────────────────
-function updateTraffic(dt) {
-  trafficCars.forEach(car => {
-    const ud  = car.userData;
-    const rt  = ud.route;
-    const from = rt[ud.rIdx % rt.length];
-    const to   = rt[(ud.rIdx+1) % rt.length];
-    const dx = to[0]-from[0], dz = to[1]-from[1];
-    const len = Math.sqrt(dx*dx+dz*dz);
-    ud.t += ud.sp * dt / len;
-    if (ud.t >= 1) { ud.t=0; ud.rIdx=(ud.rIdx+1)%rt.length; return; }
-    const cx = from[0]+dx*ud.t;
-    const cz = from[1]+dz*ud.t;
-    // Perpendicular offset for lane separation
-    const plen = len||1;
-    car.position.set(
-      cx + (-dz/plen)*ud.lane,
-      0,
-      cz + ( dx/plen)*ud.lane
-    );
-    car.rotation.y = Math.atan2(dx, dz);
+// ─── Traffic update ────────────────────────────────────────────
+function updateTraffic(dt){
+  traffic.forEach(car=>{
+    const d=car.userData, r=d.route;
+    const from=r[d.rIdx%r.length], to=r[(d.rIdx+1)%r.length];
+    const dx=to[0]-from[0], dz=to[1]-from[1];
+    const len=Math.sqrt(dx*dx+dz*dz)||1;
+    d.t += d.sp*dt/len;
+    if(d.t>=1){d.t=0;d.rIdx=(d.rIdx+1)%r.length;return;}
+    const cx=from[0]+dx*d.t, cz=from[1]+dz*d.t;
+    car.position.set(cx+(-dz/len)*d.lane, 0, cz+(dx/len)*d.lane);
+    car.rotation.y=Math.atan2(dx,dz);
   });
 }
 
-// ── Mission / crash check ─────────────────────────────────
-function checkMissions() {
-  const m = MISSIONS[missionIdx];
-  const px = moto.position.x, pz = moto.position.z;
-
-  if (phase === 'PICKUP') {
-    const d = Math.hypot(px-m.pu.x, pz-m.pu.z);
-    if (d < PICKUP_RAD) {
-      phase = 'DROPOFF';
-      currentTip = m.tip;
-      if (tipDecay) clearInterval(tipDecay);
-      tipDecay = setInterval(() => {
-        currentTip = Math.max(100, currentTip - 30);
-        updateHUD();
-      }, 1000);
-      setMarkers(missionIdx, 'DROPOFF');
-      updateHUD();
+// ─── Mission + crash check ─────────────────────────────────────
+function checkMission(){
+  const m=MISSIONS[mIdx], px=moto.position.x, pz=moto.position.z, RAD=5.5;
+  if(phase==='PICKUP'){
+    if(Math.hypot(px-m.pu.x,pz-m.pu.z)<RAD){
+      phase='DROPOFF'; curTip=m.tip;
+      if(tipTimer)clearInterval(tipTimer);
+      tipTimer=setInterval(()=>{curTip=Math.max(100,curTip-30);updateHUD();},1000);
+      setMarkers(mIdx,'DROPOFF'); updateHUD();
     }
   } else {
-    const d = Math.hypot(px-m.do.x, pz-m.do.z);
-    if (d < PICKUP_RAD) {
-      totalEarned += currentTip;
-      if (tipDecay) clearInterval(tipDecay);
-      missionIdx++;
-      if (missionIdx >= MISSIONS.length) { showWin(); return; }
-      phase = 'PICKUP';
-      refreshDots();
-      setMarkers(missionIdx, 'PICKUP');
-      currentTip = MISSIONS[missionIdx].tip;
-      updateHUD();
+    if(Math.hypot(px-m.do.x,pz-m.do.z)<RAD){
+      earned+=curTip; if(tipTimer)clearInterval(tipTimer);
+      mIdx++;
+      if(mIdx>=MISSIONS.length){showWin();return;}
+      phase='PICKUP'; refreshDots(); setMarkers(mIdx,'PICKUP');
+      curTip=MISSIONS[mIdx].tip; updateHUD();
     }
   }
 }
 
-function checkCrash() {
-  if (crashCooldown > 0) { crashCooldown--; return; }
-  for (const car of trafficCars) {
-    if (Math.hypot(moto.position.x-car.position.x, moto.position.z-car.position.z) < CRASH_RAD) {
-      motoSpeed *= -0.35;
-      if (phase === 'DROPOFF') { currentTip = Math.max(100, currentTip-200); updateHUD(); }
-      crashCooldown = 70;
-      const f = document.getElementById('crash-flash');
-      f.style.transition = 'opacity 0s';
-      f.style.opacity = 1;
-      setTimeout(() => { f.style.transition='opacity 0.25s'; f.style.opacity=0; }, 80);
+function checkCrash(){
+  if(crashCD>0){crashCD--;return;}
+  for(const c of traffic){
+    if(Math.hypot(moto.position.x-c.position.x,moto.position.z-c.position.z)<3.8){
+      mSpeed*=-.32;
+      if(phase==='DROPOFF'){curTip=Math.max(100,curTip-200);updateHUD();}
+      crashCD=70;
+      const f=document.getElementById('flash');
+      f.style.transition='opacity 0s';f.style.opacity=1;
+      setTimeout(()=>{f.style.transition='opacity .25s';f.style.opacity=0;},80);
       break;
     }
   }
 }
 
-// ── Win screen ────────────────────────────────────────────
-function showWin() {
-  gameRunning = false;
-  const win = document.createElement('div');
-  win.style.cssText = `
-    position:fixed;inset:0;background:rgba(0,0,0,0.88);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    z-index:200;color:#fff;font-family:'Arial Black','Arial',sans-serif;
+function showWin(){
+  gameRunning=false;
+  const w=document.createElement('div');
+  w.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:300;color:#fff;font-family:Arial Black,Arial,sans-serif;';
+  w.innerHTML=`
+    <div style="font-size:64px;margin-bottom:14px">🏆</div>
+    <h2 style="font-size:40px;letter-spacing:-2px;margin-bottom:8px">Shift Complete!</h2>
+    <p style="font-size:26px;color:#FFB830;margin-bottom:8px">${earned.toLocaleString()} RWF earned</p>
+    <p style="opacity:.4;font-size:12px;letter-spacing:2px;margin-bottom:36px">STAGE 3: CARS · KLA · NBO · DAR</p>
+    <button onclick="location.reload()" style="background:#FFB830;color:#000;border:none;padding:15px 48px;font-size:16px;font-weight:900;border-radius:10px;cursor:pointer;letter-spacing:2px;">RIDE AGAIN</button>
   `;
-  win.innerHTML = `
-    <div style="font-size:64px;margin-bottom:12px">🏆</div>
-    <h2 style="font-size:38px;letter-spacing:-1px;margin-bottom:8px">Shift Complete!</h2>
-    <p style="font-size:24px;color:#FFD700;margin-bottom:8px">
-      ${totalEarned.toLocaleString()} RWF earned
-    </p>
-    <p style="opacity:0.5;margin-bottom:36px;font-size:14px">
-      Stage 3 coming: Cars · Kigali City · KLA · NBO
-    </p>
-    <button onclick="location.reload()" style="
-      background:#00ff88;color:#000;border:none;
-      padding:15px 48px;font-size:17px;font-weight:900;
-      border-radius:10px;cursor:pointer;letter-spacing:1px;
-    ">RIDE AGAIN</button>
-  `;
-  document.body.appendChild(win);
+  document.body.appendChild(w);
 }
 
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 //  GAME LOOP
-// ═══════════════════════════════════════════════════════════
-let lastTS = null;
+// ═══════════════════════════════════════════════════════════════
+const ACCEL=.018, MAX_SPD=.70, FRIC=.91, TURN=.034;
 
-function loop(ts) {
+let lastT=null;
+function loop(ts){
   requestAnimationFrame(loop);
-  const dt = lastTS ? Math.min((ts - lastTS) / 16.67, 3) : 1;
-  lastTS = ts;
+  const dt=lastT?Math.min((ts-lastT)/16.67,3):1; lastT=ts;
 
-  if (!gameRunning) { renderer.render(scene, camera); return; }
-
-  const t = ts * 0.001;
-
-  // ── Animate markers ────────────────────────
-  if (pickupMarker)  { pickupMarker.position.y  = Math.sin(t*3)*0.18;    pickupMarker.rotation.y  += 0.022*dt; }
-  if (dropoffMarker) { dropoffMarker.position.y = Math.sin(t*3+1)*0.18;  dropoffMarker.rotation.y += 0.022*dt; }
-
-  // ── Input ─────────────────────────────────
-  const fwd   = keys['KeyW']||keys['ArrowUp']   || (joyActive && joyY < -0.25);
-  const back   = keys['KeyS']||keys['ArrowDown'] || (joyActive && joyY >  0.25);
-  const left   = keys['KeyA']||keys['ArrowLeft'] || (joyActive && joyX < -0.25);
-  const right  = keys['KeyD']||keys['ArrowRight']|| (joyActive && joyX >  0.25);
-  const braking = keys['Space'];
-
-  const accel = fwd ? 1 : back ? -0.45 : 0;
-  const steer = left ? 1 : right ? -1 : 0;
-
-  motoSpeed += accel * ACCEL * dt;
-  if (braking) motoSpeed *= 0.72;
-  motoSpeed *= Math.pow(FRICTION, dt);
-  motoSpeed = Math.max(-MAX_SPEED*0.35, Math.min(MAX_SPEED, motoSpeed));
-
-  const speedAbs = Math.abs(motoSpeed);
-  if (speedAbs > 0.004) {
-    moto.rotation.y += steer * TURN_SPD * (speedAbs/MAX_SPEED) * dt;
+  if(!gameRunning){
+    composer?composer.render():renderer.render(scene,camera);
+    return;
   }
 
-  const dir = new THREE.Vector3(Math.sin(moto.rotation.y), 0, Math.cos(moto.rotation.y));
-  moto.position.addScaledVector(dir, motoSpeed * dt);
-  moto.position.y = 0;
+  const t=ts*.001;
 
-  // Wheel spin
-  wheels.forEach(w => { w.rotation.y += motoSpeed * 2.6 * dt; });
+  // ── Animate beacons ──
+  const pulsate=(marker)=>{
+    if(!marker) return;
+    const tt = Math.sin(t*3)*.15;
+    marker.position.y = tt;
+    marker.rotation.y += .025*dt;
+    if(marker.userData.top) marker.userData.top.rotation.y = t*2;
+    if(marker.userData.ring2) marker.userData.ring2.scale.setScalar(.7+Math.sin(t*4)*.2);
+  };
+  pulsate(puMarker); pulsate(doMarker);
 
-  // ── Moto tilt (lean into turns) ────────────
-  const targetLean = -steer * (speedAbs/MAX_SPEED) * 0.18;
-  moto.rotation.z += (targetLean - moto.rotation.z) * 0.12 * dt;
+  // ── Input ──
+  const fwd   = keys['KeyW']||keys['ArrowUp']    ||(jActive&&jY<-.2);
+  const back  = keys['KeyS']||keys['ArrowDown']  ||(jActive&&jY>.2);
+  const left  = keys['KeyA']||keys['ArrowLeft']  ||(jActive&&jX<-.2);
+  const right = keys['KeyD']||keys['ArrowRight'] ||(jActive&&jX>.2);
+  const brake = keys['Space'];
 
-  // ── Traffic ───────────────────────────────
+  mSpeed += (fwd?1:back?-.45:0) * ACCEL * dt;
+  if(brake) mSpeed *= .72;
+  mSpeed *= Math.pow(FRIC,dt);
+  mSpeed = Math.max(-MAX_SPD*.35, Math.min(MAX_SPD,mSpeed));
+
+  const sAbs=Math.abs(mSpeed);
+  if(sAbs>.005) moto.rotation.y += (left?1:right?-1:0)*TURN*(sAbs/MAX_SPD)*dt;
+
+  const dir=new THREE.Vector3(Math.sin(moto.rotation.y),0,Math.cos(moto.rotation.y));
+  moto.position.addScaledVector(dir,mSpeed*dt);
+  moto.position.y=0;
+
+  // Wheel spin + lean
+  motoWheels.forEach(w=>w.rotation.y+=mSpeed*2.8*dt);
+  const targetLean=-(left?1:right?-1:0)*(sAbs/MAX_SPD)*.2;
+  moto.rotation.z+=(targetLean-moto.rotation.z)*.1*dt;
+
+  // ── Traffic + checks ──
   updateTraffic(dt);
-
-  // ── Collision / Missions ──────────────────
   checkCrash();
-  checkMissions();
+  checkMission();
 
-  // ── Speedo ────────────────────────────────
-  const kmh = speedAbs * 220;
-  document.getElementById('speed-num').textContent = Math.round(kmh);
+  // ── Speedo ──
+  document.getElementById('spd').textContent = Math.round(sAbs*220);
 
-  // ── Camera ────────────────────────────────
-  if (camMode === '3rd') {
-    // Third-person chase cam — floats behind and above, looks ahead
-    const camDist = CAM3_DIST + speedAbs * 10;
-    const camH    = CAM3_H    + speedAbs * 5;
-    const ideal = moto.position.clone().add(
-      new THREE.Vector3(-dir.x*camDist, camH, -dir.z*camDist)
+  // ── FOV changes at speed ──
+  camera.fov = 78 + sAbs*20;
+  camera.updateProjectionMatrix();
+
+  // ── Camera ──
+  if(camMode==='3rd'){
+    const dist=10+sAbs*12, ht=2.4+sAbs*3;
+    const ideal=moto.position.clone().add(
+      new THREE.Vector3(-dir.x*dist,ht,-dir.z*dist)
     );
-    cam3Pos.lerp(ideal, CAM_LAG * dt);
-    camera.position.copy(cam3Pos);
-
-    const lookAt = moto.position.clone().addScaledVector(dir, 6).add(new THREE.Vector3(0, 1.2, 0));
-    cam3Target.lerp(lookAt, 0.12 * dt);
-    camera.lookAt(cam3Target);
-
+    c3Pos.lerp(ideal,.08*dt);
+    camera.position.copy(c3Pos);
+    const look=moto.position.clone().addScaledVector(dir,7).add(new THREE.Vector3(0,1.2,0));
+    c3Look.lerp(look,.1*dt);
+    camera.lookAt(c3Look);
+    camera.rotation.z = moto.rotation.z*.6; // subtle lean in 3rd person
   } else {
-    // First-person — helmet cam
-    const helmPos = moto.position.clone().add(
-      new THREE.Vector3(dir.x*-0.08, 2.15, dir.z*-0.08)
+    // First-person: helmet POV
+    const fpPos = moto.position.clone().add(
+      new THREE.Vector3(-dir.x*.05, 1.92, -dir.z*.05)
     );
-    camera.position.copy(helmPos);
-    const fp_look = helmPos.clone().addScaledVector(dir, 12).add(new THREE.Vector3(0, -0.3, 0));
-    camera.lookAt(fp_look);
-    camera.rotation.z = moto.rotation.z * 1.4; // exaggerate lean in FP
+    camera.position.copy(fpPos);
+    const fpLook = fpPos.clone().addScaledVector(dir,14).add(new THREE.Vector3(0,-.25,0));
+    camera.lookAt(fpLook);
+    camera.rotation.z = moto.rotation.z*1.6; // lean in helmet cam
+    drawSpeedLines(sAbs/MAX_SPD);
   }
 
-  renderer.render(scene, camera);
+  // ── Render ──
+  composer ? composer.render() : renderer.render(scene,camera);
 }
 
-// ── Resize ─────────────────────────────────
-window.addEventListener('resize', () => {
-  camera.aspect = innerWidth/innerHeight;
+// ── Resize ──
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth,innerHeight);
+  if(composer) composer.setSize(innerWidth,innerHeight);
+  resizeLines();
 });
 
 requestAnimationFrame(loop);
